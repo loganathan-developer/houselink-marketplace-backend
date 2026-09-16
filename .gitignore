@@ -1,7 +1,25 @@
+# Dependencies
 node_modules/
+
+# Build
 dist/
+
+# Environment variables
 .env
 .env.*
 !.env.example
-coverage/
+
+# Logs
 *.log
+logs/
+
+# Testing
+coverage/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
