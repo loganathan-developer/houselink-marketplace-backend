@@ -1,25 +1,12 @@
-# Dependencies
 node_modules/
-
-# Build
 dist/
+coverage/
 
-# Environment variables
 .env
 .env.*
 !.env.example
 
-# Logs
 *.log
-logs/
+/src/generated/prisma
 
-# Testing
-coverage/
-
-# OS
-.DS_Store
-Thumbs.db
-
-# IDE
-.vscode/
-.idea/
+/src/generated/prisma

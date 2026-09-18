@@ -1,0 +1,137 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserStatus {
+  ACTIVE
+  BLOCKED
+}
+
+enum AuthProvider {
+  PHONE
+  EMAIL
+  GOOGLE
+}
+
+enum OtpChannel {
+  PHONE
+  EMAIL
+}
+
+enum OtpPurpose {
+  LOGIN
+  LINK_IDENTITY
+}
+
+enum SessionContext {
+  CUSTOMER
+  STAFF
+}
+
+model User {
+  id                 String              @id @default(uuid()) @db.Uuid
+  name               String?
+  status             UserStatus          @default(ACTIVE)
+  createdAt          DateTime            @default(now()) @db.Timestamptz(6)
+  updatedAt          DateTime            @updatedAt @db.Timestamptz(6)
+  roles              UserRole[]
+  identities         AuthIdentity[]
+  passwordCredential PasswordCredential?
+  otpChallenges      OtpChallenge[]
+  sessions           AuthSession[]
+}
+
+model Role {
+  id        String     @id @default(uuid()) @db.Uuid
+  code      String     @unique
+  userRoles UserRole[]
+}
+
+model UserRole {
+  userId     String   @db.Uuid
+  roleId     String   @db.Uuid
+  assignedAt DateTime @default(now()) @db.Timestamptz(6)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Restrict)
+  role       Role     @relation(fields: [roleId], references: [id], onDelete: Restrict)
+
+  @@id([userId, roleId])
+  @@index([roleId])
+}
+
+model AuthIdentity {
+  id         String       @id @default(uuid()) @db.Uuid
+  userId     String       @db.Uuid
+  provider   AuthProvider
+  identifier String
+  verifiedAt DateTime     @db.Timestamptz(6)
+  createdAt  DateTime     @default(now()) @db.Timestamptz(6)
+  user       User         @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@unique([provider, identifier])
+  @@index([userId])
+}
+
+model PasswordCredential {
+  userId            String   @id @db.Uuid
+  passwordHash      String
+  passwordChangedAt DateTime @db.Timestamptz(6)
+  user              User     @relation(fields: [userId], references: [id], onDelete: Restrict)
+}
+
+model OtpChallenge {
+  id            String     @id @default(uuid()) @db.Uuid
+  destination   String
+  channel       OtpChannel
+  purpose       OtpPurpose
+  userId        String?    @db.Uuid
+  codeDigest    String
+  createdAt     DateTime   @default(now()) @db.Timestamptz(6)
+  expiresAt     DateTime   @db.Timestamptz(6)
+  attemptCount  Int        @default(0)
+  consumedAt    DateTime?  @db.Timestamptz(6)
+  invalidatedAt DateTime?  @db.Timestamptz(6)
+  user          User?      @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@index([destination, channel, purpose, createdAt])
+  @@index([expiresAt])
+}
+
+model AuthSession {
+  id                String         @id @default(uuid()) @db.Uuid
+  userId            String         @db.Uuid
+  context           SessionContext
+  mfaVerifiedAt     DateTime?      @db.Timestamptz(6)
+  createdAt         DateTime       @default(now()) @db.Timestamptz(6)
+  lastSeenAt        DateTime       @db.Timestamptz(6)
+  idleExpiresAt     DateTime       @db.Timestamptz(6)
+  absoluteExpiresAt DateTime       @db.Timestamptz(6)
+  revokedAt         DateTime?      @db.Timestamptz(6)
+  user              User           @relation(fields: [userId], references: [id], onDelete: Restrict)
+  refreshTokens     RefreshToken[]
+
+  @@index([userId, revokedAt])
+  @@index([absoluteExpiresAt])
+  @@index([idleExpiresAt])
+}
+
+model RefreshToken {
+  id           String        @id @default(uuid()) @db.Uuid
+  sessionId    String        @db.Uuid
+  tokenHash    String        @unique
+  createdAt    DateTime      @default(now()) @db.Timestamptz(6)
+  expiresAt    DateTime      @db.Timestamptz(6)
+  consumedAt   DateTime?     @db.Timestamptz(6)
+  revokedAt    DateTime?     @db.Timestamptz(6)
+  replacedById String?       @unique @db.Uuid
+  session      AuthSession   @relation(fields: [sessionId], references: [id], onDelete: Restrict)
+  replacement  RefreshToken? @relation("RefreshTokenRotation", fields: [replacedById], references: [id], onDelete: Restrict)
+  replaces     RefreshToken? @relation("RefreshTokenRotation")
+
+  @@index([sessionId])
+  @@index([expiresAt])
+}
