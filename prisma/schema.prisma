@@ -10,6 +10,15 @@ datasource db {
 enum UserStatus {
   ACTIVE
   BLOCKED
+  DELETED
+}
+
+model RateLimitBucket {
+  key       String   @id
+  hits      Int
+  expiresAt DateTime @db.Timestamptz(6)
+
+  @@index([expiresAt])
 }
 
 enum AuthProvider {

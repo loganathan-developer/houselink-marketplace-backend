@@ -26,11 +26,14 @@ export const errorHandler: ErrorRequestHandler = (error, _req, res, next) => {
   const isServerError = httpError.statusCode >= 500;
   if (isServerError) {
     logger.error(
-      { err: error instanceof Error ? error : undefined, requestId: res.locals.requestId },
+      { errorType: error instanceof Error ? error.name : "Unknown", requestId: res.locals.requestId },
       "Unhandled request error",
     );
   }
 
+  if ([401, 403, 429].includes(httpError.statusCode)) {
+    logger.warn({ event: "auth_request_rejected", code: httpError.code, requestId: res.locals.requestId, route: _req.route?.path ?? "unmatched" }, "Request rejected");
+  }
   res.status(httpError.statusCode).json({
     success: false,
     error: {

@@ -6,10 +6,16 @@
   "main": "dist/server.js",
   "type": "module",
   "scripts": {
+    "test": "tsx --test tests/auth.test.ts",
+    "test:setup": "node tests/setup-test-db.mjs",
     "dev": "tsx watch src/server.ts",
     "build": "tsc",
     "start": "node --enable-source-maps dist/server.js",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "seed:roles": "tsx prisma/seed.ts"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
   },
   "repository": {
     "type": "git",
@@ -19,13 +25,20 @@
   "dependencies": {
     "@prisma/adapter-pg": "^7.10.0",
     "@prisma/client": "^7.10.0",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
+    "express-rate-limit": "^8.7.0",
+    "helmet": "^8.3.0",
+    "jose": "^6.2.12",
     "pg": "^8.23.0",
     "pino": "^10.3.1",
     "zod": "^4.6.5"
   },
   "devDependencies": {
+    "@types/cookie-parser": "^1.4.10",
+    "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/node": "^22.20.3",
     "prisma": "^7.10.0",

@@ -1,10 +1,10 @@
-database-design.md# Authentication Database Design
+# Authentication Database Design
 
 ## Scope
 
-Authentication for the fashion marketplace:
-- Buyer and Seller: phone OTP, email OTP and Google login.
-- Staff: privately provisioned accounts with password and MFA.
+Authentication design for the marketplace (planned features are labeled below):
+- Buyer and Seller: phone/email OTP implemented; Google login planned.
+- Staff: private password + MFA login planned; ADMIN authorization already requires a STAFF session with MFA.
 - JWT access tokens with rotating refresh tokens.
 - PostgreSQL stores identities, roles and login sessions.
 
@@ -17,15 +17,15 @@ Authentication for the fashion marketplace:
 - Use `SameSite=Lax` for the planned same-site web frontend. If a future
   deployment requires cross-site cookies, use `SameSite=None` only with
   `Secure=true` and CSRF protection. Keep cookies host-only by omitting Domain.
-- Access tokens expire after 15 minutes. Set the access cookie `Max-Age` to
-  the remaining access-token lifetime.
-- Refresh tokens expire after at most 30 days and rotate on every use. Set
-  the refresh cookie `Max-Age` to the remaining refresh-token lifetime,
-  never beyond the session's absolute expiry.
-- Scope the access cookie to `/` and the refresh cookie to `/api/auth`.
+- Access tokens default to 15 minutes (configuration capped at one hour). Cookie
+  `Expires` matches JWT expiry, capped by the session lifetime.
+- Refresh tokens default to seven days and rotate on every use. Cookie `Expires`
+  matches token expiry, capped by idle and absolute session expiry. Sessions
+  default to seven idle days and thirty absolute days.
+- Scope the access cookie to `/api` and the refresh cookie to `/api/auth`.
   Keep the refresh and logout endpoints under that path.
 - On logout, revoke the server-side session and its refresh-token state,
-  then clear both cookies with matching names and scope and `Max-Age=0`.
+  then clear both cookies with matching names and scope and an expired `Expires` date.
 
 ## Common conventions
 
@@ -43,7 +43,7 @@ Purpose: Store the account.
 Fields:
 - id: UUID, primary key.
 - name: text, optional.
-- status: enum ACTIVE or BLOCKED, default ACTIVE.
+- status: enum ACTIVE, BLOCKED or DELETED, default ACTIVE.
 - createdAt: timestamp, default current time.
 - updatedAt: timestamp, maintained on updates.
 
@@ -61,7 +61,6 @@ Initial values:
 - BUYER
 - SELLER
 - ADMIN
-- SUPER_ADMIN
 
 ## 3. UserRole
 
@@ -96,7 +95,7 @@ Constraints:
 
 Rules:
 - PHONE identifier uses normalized international format.
-- EMAIL identifier uses a documented normalization policy.
+- EMAIL identifier is trimmed and lowercased; dots and plus tags are preserved.
 - GOOGLE identifier stores Google's stable subject ID.
 - Create the identity only after successful verification.
 - Never merge accounts automatically because emails match.
@@ -113,7 +112,7 @@ Fields:
 - passwordChangedAt: timestamp.
 
 Rules:
-- Passwords are hashed using Argon2id.
+- Planned staff password implementation must hash passwords using Argon2id.
 - OTP-only accounts do not need this record.
 - A password alone does not grant staff access.
 - Staff sessions require successful MFA.
@@ -141,14 +140,15 @@ Indexes:
 
 Rules:
 - A new customer's challenge does not require a userId.
-- Linking requires a userId and an authenticated session.
+- LINK_IDENTITY remains planned and is rejected by public OTP schemas. Future linking requires a userId and an authenticated session.
 - Store a keyed digest of the OTP, not a plain short-code hash.
 - Keep the digest key outside the database.
 - Reject expired, consumed or invalidated challenges.
 - Verify and consume a challenge atomically.
 - Resending invalidates the previous challenge.
 - Enforce attempt, resend and broader abuse limits.
-- Expired challenge records are cleaned up.
+- Resend availability is computed from createdAt plus the configured cooldown.
+- Cleanup is an operational task; no scheduled deletion job is implemented.
 
 ## 7. AuthSession
 
@@ -176,7 +176,7 @@ Rules:
 - STAFF sessions require MFA before privileged access.
 - Refreshing cannot extend the absolute session lifetime.
 - Logout revokes the current session.
-- Logout-all and account blocking revoke all user sessions.
+- Logout-all revokes all user sessions. Authentication and refresh reject BLOCKED/DELETED users on every request; future status-changing services should also revoke sessions in the same transaction.
 
 ## 8. RefreshToken
 
@@ -244,3 +244,35 @@ A Seller role alone does not authorize approved-seller actions.
 Database constraints protect relationships and uniqueness.
 Backend services enforce verification, permissions, ownership,
 rate limits and allowed state transitions.
+
+## Implemented abuse protection and transaction rules
+
+RateLimitBucket stores a hashed scope/IP key, hit count and expiry with an expiry index.
+Atomic PostgreSQL upserts share IP limits across API instances. IPv6 uses /56 grouping.
+OTP request/verify share a destination/channel/LOGIN advisory lock. Verification requires
+the exact challenge UUID plus matching destination/channel/purpose. The HMAC includes
+all four plus the OTP; phone digest format is preserved. No raw OTP or refresh token
+is stored in PostgreSQL. Plain mock codes exist only in bounded local development memory.
+
+Wrong attempts commit before the API returns 401. User creation, BUYER assignment,
+challenge consumption, session creation and refresh hashing commit together.
+User advisory locks serialize login session creation, refresh, logout and logout-all.
+Refresh replacement stays in the same session; consumed token reuse revokes that session
+and all its tokens before returning 401. Status and roles are read from the database
+on every protected request; existing access JWTs therefore stop working after revocation.
+
+The existing 20260918120000_auth_security migration adds DELETED and RateLimitBucket.
+This audit adds no migration, index, constraint or schema change. Existing UUID keys,
+identity uniqueness, foreign keys with Restrict and authentication query indexes suffice.
+Future administrative status/role changes must use the same user lock where atomicity
+with authentication is required. Ownership filters belong in future resource services.
+
+## Retention operations
+
+Schedule bounded batches deleting expired RateLimitBucket records using the expiry index.
+Remove expired OTP challenges according to the audit/privacy retention policy. Retain
+consumed refresh records through session expiry for replay detection; subsequently delete
+self-referencing refresh history in a controlled order before deleting expired sessions.
+There is no background retention worker in this repository. Never reset the application
+database to clean up authentication records. Readiness checks database/BUYER availability;
+migration status remains a separate deployment gate.
