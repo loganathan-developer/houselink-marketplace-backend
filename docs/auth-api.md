@@ -5,6 +5,12 @@
 Run `npx prisma migrate deploy`, `npx prisma generate`, `npm run seed:roles`, then `npm run dev`.
 The default API address is `http://localhost:5000`.
 
+For the simplified development flow, set `NODE_ENV=development`, `OTP_PROVIDER=mock`
+and `ALLOW_ANY_DEV_OTP=true`. The frontend calls `/api/auth/otp/request`, stores the
+returned `challengeId`, then calls `/api/auth/otp/verify` with that `challengeId` and
+any six-digit numeric OTP. The mock retrieval endpoint is optional debug tooling only
+and remains disabled unless `ENABLE_MOCK_OTP_RETRIEVAL=true`.
+
 Run `npm run test:setup` once to provision the separate local
 `houselink_auth_step15_test` database and its non-superuser test role. Provisioning
 uses only a loopback development PostgreSQL server's maintenance database; it requires
@@ -48,8 +54,8 @@ All auth responses include `Cache-Control: no-store`. Errors use the existing
 | --- | --- | --- | --- | --- | --- | --- |
 | GET | /api/health | None | None | 200 liveness | 403 origin | All environments |
 | GET | /api/ready | None | None | 200 DB and BUYER ready | 503 unavailable, 403 origin | All environments |
-| POST | /api/auth/otp/request | None | Phone or email request below | 200 challengeId, expiresAt, resendAvailableAt | 400, 403, 429, 503 delivery | Customer API; real delivery blocked |
-| POST | /api/auth/otp/verify | None | Matching phone/email, challengeId UUID, otp string | 200 safe user + cookies | 400, 401 invalid OTP, 403, 429 | Customer API |
+| POST | /api/auth/otp/request | None | Phone or email request below | 200 challengeId | 400, 403, 429, 503 delivery | Customer API; real delivery blocked |
+| POST | /api/auth/otp/verify | None | challengeId UUID, otp string; optional matching phone/email | 200 safe user + cookies | 400, 401 invalid OTP, 403, 429 | Customer API |
 | POST | /api/auth/refresh | Refresh cookie | No body required | 200 success + replacement cookies | 401, 403, 429 | Customer API |
 | GET | /api/auth/me | Valid access cookie; any role | None | 200 safe user | 401, 403 origin, 429 | Customer API |
 | POST | /api/auth/logout | Optional access/refresh cookie | No body required | 200 success + cleared cookies | 403, 429 | Customer API; idempotent |
@@ -81,17 +87,19 @@ one of phone/email. Extra fields, client roles, mismatched channels and LINK_IDE
 are rejected with 400. Email is trimmed and lowercased; dots and plus tags are preserved.
 Phone/email identities are never automatically merged or linked to another account.
 
-Verification uses the same destination fields plus the challenge UUID returned by request:
+Verification uses the challenge UUID returned by request:
 
 ```json
-{ "phone": "+919876543210", "challengeId": "returned-uuid", "otp": "012345" }
+{ "challengeId": "returned-uuid", "otp": "012345" }
 ```
 
-For email, replace phone with email. **Breaking security change:** challengeId is now
-required. Verification no longer guesses the latest challenge for a phone number.
-The challenge must also match channel, destination and LOGIN purpose. **CSRF contract
-change:** origin-less Postman/CLI requests must now supply the configured Origin or a
-Referer from that exact origin, as well as X-CSRF-Protection: 1.
+Supplying the matching phone or email is still accepted for compatibility. When supplied,
+the challenge must also match channel, destination and LOGIN purpose. Without phone/email,
+the backend loads the destination from the challenge itself. **Breaking security change:**
+challengeId is now required. Verification no longer guesses the latest challenge for a
+phone number. **CSRF contract change:** origin-less Postman/CLI requests must now supply
+the configured Origin or a Referer from that exact origin, as well as
+X-CSRF-Protection: 1.
 
 Phone normalization trims whitespace and removes spaces, parentheses and hyphens.
 OTP must be a six-character numeric string; leading zeros are preserved.
@@ -208,9 +216,10 @@ receipt timeout is 30 seconds, headers 10 seconds, idle sockets 30 seconds and k
 Prisma; a 10-second deadline forces termination. Fatal exceptions/rejections exit with
 failure after cleanup. A process supervisor should restart the service.
 
-Postman/manual flow (cookie jar enabled, base http://localhost:5000): health -> OTP
-request -> opt-in local mock retrieval -> verify with challengeId -> me -> refresh ->
-me -> logout -> refresh returns 401. Logout-all invalidates every existing device session;
+Postman/manual development flow (cookie jar enabled, base http://localhost:5000):
+health -> OTP request -> verify with challengeId and any six-digit numeric OTP when
+`ALLOW_ANY_DEV_OTP=true` -> me -> refresh -> me -> logout -> refresh returns 401.
+Logout-all invalidates every existing device session;
 protected APIs check session state, so old access JWTs stop working immediately as well.
 Phone and email follow the same flow. Login, refresh and logout concurrency is serialized
 in PostgreSQL. A refresh may complete just before concurrent logout, but its newly issued

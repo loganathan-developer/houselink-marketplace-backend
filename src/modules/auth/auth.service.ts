@@ -33,6 +33,11 @@ type VerifyLoginOtpResult = {
   tokens: AuthTokens;
 };
 
+const allowAnyDevelopmentOtp = () =>
+  env.NODE_ENV === "development" &&
+  env.OTP_PROVIDER === "mock" &&
+  env.ALLOW_ANY_DEV_OTP === true;
+
 const invalidOtpError = () =>
   new HttpError(
     401,
@@ -248,9 +253,14 @@ export function getDevelopmentMockOtp(
 export async function verifyLoginOtp(
   input: VerifyOtpBody,
 ): Promise<VerifyLoginOtpResult> {
-  const { channel, challengeId, otp } = input;
-  const destination = "phone" in input ? input.phone : input.email;
-  const lockKey = advisoryLockKey(`otp:${channel}:LOGIN:${destination}`);
+  const { challengeId, otp } = input;
+  const expectedDestination = "phone" in input ? input.phone : "email" in input ? input.email : undefined;
+  const expectedChannel = "phone" in input ? "PHONE" : "email" in input ? "EMAIL" : undefined;
+  const lockKey = advisoryLockKey(
+    expectedDestination && expectedChannel
+      ? `otp:${expectedChannel}:LOGIN:${expectedDestination}`
+      : `otp-challenge:${challengeId}`,
+  );
 
   const result = await prisma.$transaction(async (tx) => {
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(${lockKey})`;
@@ -259,13 +269,14 @@ export async function verifyLoginOtp(
     const challenge = await tx.otpChallenge.findFirst({
       where: {
         id: challengeId,
-        destination,
-        channel,
+        ...(expectedDestination ? { destination: expectedDestination } : {}),
+        ...(expectedChannel ? { channel: expectedChannel } : {}),
         purpose: "LOGIN",
       },
       select: {
         id: true,
         destination: true,
+        channel: true,
         codeDigest: true,
         expiresAt: true,
         attemptCount: true,
@@ -284,6 +295,7 @@ export async function verifyLoginOtp(
       return { kind: "invalid" as const };
     }
 
+    const { destination, channel } = challenge;
     const candidateDigest = hashOtp({
       challengeId: challenge.id,
       destination,
@@ -292,10 +304,11 @@ export async function verifyLoginOtp(
       otp,
     });
 
-    const isCorrectOtp = verifyOtpDigest(
-      candidateDigest,
-      challenge.codeDigest,
-    );
+    const isCorrectOtp = allowAnyDevelopmentOtp() ||
+      verifyOtpDigest(
+        candidateDigest,
+        challenge.codeDigest,
+      );
 
     if (!isCorrectOtp) {
       const shouldInvalidate =

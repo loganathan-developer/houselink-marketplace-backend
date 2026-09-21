@@ -47,12 +47,16 @@ See [API contracts and security policy](docs/auth-api.md) and
 [database design](docs/database-design.md).
 
 Phone and email OTP login, `/me`, refresh rotation, logout and logout-all are implemented.
-For local mock retrieval explicitly set `ENABLE_MOCK_OTP_RETRIEVAL=true`; the endpoint
-also requires `OTP_PROVIDER=mock` and a loopback client. Mock delivery is local testing
-only and does not send SMS or email. Google and staff login remain planned.
+For simplified local development, set `NODE_ENV=development`, `OTP_PROVIDER=mock` and
+`ALLOW_ANY_DEV_OTP=true`; `/api/auth/otp/verify` then accepts any six-digit numeric OTP
+for an existing challenge. For local mock retrieval explicitly set
+`ENABLE_MOCK_OTP_RETRIEVAL=true`; the endpoint also requires `OTP_PROVIDER=mock` and a
+loopback client. Mock delivery is local testing only and does not send SMS or email.
+Google and staff login remain planned.
 
 **Production is blocked until a real SMS/email provider is implemented and configured.**
 `OTP_PROVIDER=sms` currently fails startup; there is no silent mock fallback.
+Production rejects `ALLOW_ANY_DEV_OTP=true`.
 
 After provider integration, deploy with `NODE_ENV=production`, strong independent secrets,
 an HTTPS `FRONTEND_ORIGIN`, Secure cookies and mock retrieval disabled. Set `TRUST_PROXY`

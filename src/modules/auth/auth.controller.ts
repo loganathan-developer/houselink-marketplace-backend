@@ -9,7 +9,7 @@ import { rotateRefreshToken, revokeSessionFromCookies, revokeSessions, unauthent
 export async function requestOtp(_req: Request, res: Response) {
   const body = res.locals.validated.body as RequestOtpBody;
   const result = await requestLoginOtp(body);
-  res.json({ success: true, data: result, message: "If the destination can receive OTPs, a code has been sent." });
+  res.json({ success: true, data: { challengeId: result.challengeId } });
 }
 export async function getMockOtp(req: Request, res: Response) {
   const id = req.params.challengeId;

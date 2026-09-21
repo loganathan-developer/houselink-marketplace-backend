@@ -34,6 +34,7 @@ process.env.DATABASE_URL = url.toString();
 process.env.NODE_ENV = "test";
 process.env.OTP_PROVIDER = "mock";
 process.env.ENABLE_MOCK_OTP_RETRIEVAL = "true";
+process.env.ALLOW_ANY_DEV_OTP = "false";
 process.env.COOKIE_SECURE = "false";
 process.env.COOKIE_SAME_SITE = "lax";
 process.env.JWT_SECRET = "test-only-jwt-secret-not-for-production-12345";
@@ -60,6 +61,21 @@ let roleBase: string;
 let phoneNumber = 1000000000;
 const csrf = { "X-CSRF-Protection": "1", Origin: env.FRONTEND_ORIGIN };
 let schemaCreated = false;
+
+async function withEnv<T>(
+  overrides: Partial<typeof env>,
+  callback: () => Promise<T>,
+): Promise<T> {
+  const original = Object.fromEntries(
+    Object.keys(overrides).map((key) => [key, env[key as keyof typeof env]]),
+  ) as Partial<typeof env>;
+  Object.assign(env, overrides);
+  try {
+    return await callback();
+  } finally {
+    Object.assign(env, original);
+  }
+}
 
 before(async () => {
   const client = await pool.connect();
@@ -170,7 +186,9 @@ test("complete request/mock/verify flow consumes OTP and creates one BUYER sessi
   const phone = `+91${++phoneNumber}`;
   const response = await request("/otp/request", "", { phone });
   assert.equal(response.status, 200);
-  const id = (await response.json()).data.challengeId as string;
+  const requestBody = await response.json();
+  assert.deepEqual(Object.keys(requestBody.data), ["challengeId"]);
+  const id = requestBody.data.challengeId as string;
   assert.equal(await prisma.authIdentity.count({ where: { identifier: phone } }), 0);
   const mock = await request(`/otp/mock/${id}`);
   assert.equal(mock.status, 200);
@@ -215,6 +233,48 @@ test("complete request/mock/verify flow consumes OTP and creates one BUYER sessi
   assert.equal(expiry(auth.values.find((value) => value.startsWith("access_token="))!), decodeJwt(auth.access).exp! * 1000);
   assert.equal(expiry(auth.values.find((value) => value.startsWith("refresh_token="))!), Math.floor(refresh.expiresAt.getTime() / 1000) * 1000);
   assert.equal((await request("/me", auth.cookie)).status, 200);
+});
+
+test("development mock allow-any OTP accepts different 6-digit codes without mock retrieval", async () => {
+  await withEnv({ NODE_ENV: "development", OTP_PROVIDER: "mock", ALLOW_ANY_DEV_OTP: true }, async () => {
+    for (const otp of ["123456", "987654"] as const) {
+      const phone = `+91${++phoneNumber}`;
+      const response = await request("/otp/request", "", { phone });
+      assert.equal(response.status, 200);
+      const challengeId = (await response.json()).data.challengeId as string;
+      const verified = await request("/otp/verify", "", { challengeId, otp });
+      assert.equal(verified.status, 200, await verified.clone().text());
+      assert.deepEqual((await verified.json()).data.user.roles, ["BUYER"]);
+      assert(cookies(verified).access);
+      assert.equal((await prisma.otpChallenge.findUniqueOrThrow({ where: { id: challengeId } })).attemptCount, 0);
+    }
+  });
+});
+
+test("development mock allow-any OTP still rejects malformed codes during validation", async () => {
+  await withEnv({ NODE_ENV: "development", OTP_PROVIDER: "mock", ALLOW_ANY_DEV_OTP: true }, async () => {
+    const value = await challenge();
+    for (const otp of ["abcdef", "12345", "1234567"] as const) {
+      const response = await request("/otp/verify", "", { challengeId: value.id, otp });
+      assert.equal(response.status, 400, otp);
+    }
+    assert.equal((await prisma.otpChallenge.findUniqueOrThrow({ where: { id: value.id } })).attemptCount, 0);
+  });
+});
+
+test("allow-any OTP is gated by development, mock provider and explicit opt-in", async () => {
+  for (const overrides of [
+    { NODE_ENV: "test" as const, OTP_PROVIDER: "mock" as const, ALLOW_ANY_DEV_OTP: true },
+    { NODE_ENV: "development" as const, OTP_PROVIDER: "sms" as const, ALLOW_ANY_DEV_OTP: true },
+    { NODE_ENV: "development" as const, OTP_PROVIDER: "mock" as const, ALLOW_ANY_DEV_OTP: false },
+  ]) {
+    await withEnv(overrides, async () => {
+      const value = await challenge();
+      const response = await request("/otp/verify", "", { challengeId: value.id, otp: "999999" });
+      assert.equal(response.status, 401, JSON.stringify(overrides));
+      assert.equal((await prisma.otpChallenge.findUniqueOrThrow({ where: { id: value.id } })).attemptCount, 1);
+    });
+  }
 });
 
 for (const state of ["expired", "invalidated"] as const) {
@@ -352,19 +412,21 @@ test("production cookies require Secure; mock flags parse correctly and producti
     const res = { cookie: (_name, _value, opts) => options.push(opts), clearCookie: (_name, opts) => options.push(opts) };
     setAuthCookies(res, { accessToken: 'test', refreshToken: 'test', accessExpiresAt: new Date(), refreshExpiresAt: new Date() });
     clearAuthCookies(res);
-    console.log(JSON.stringify({ mockEnabled: env.ENABLE_MOCK_OTP_RETRIEVAL, options }));
+    console.log(JSON.stringify({ mockEnabled: env.ENABLE_MOCK_OTP_RETRIEVAL, allowAnyDevOtp: env.ALLOW_ANY_DEV_OTP, options }));
   `;
   const probe = (overrides: Record<string, string>) => runNode( ["--import", "tsx", "--input-type=module", "-e", code], {
-    encoding: "utf8", env: { ...process.env, NODE_ENV: "production", OTP_PROVIDER: "sms", ENABLE_MOCK_OTP_RETRIEVAL: "false", COOKIE_SECURE: "true", FRONTEND_ORIGIN: "https://shop.example.com", JWT_SECRET: randomBytes(32).toString("hex"), OTP_HASH_SECRET: randomBytes(32).toString("hex"), ...overrides },
+    encoding: "utf8", env: { ...process.env, NODE_ENV: "production", OTP_PROVIDER: "sms", ENABLE_MOCK_OTP_RETRIEVAL: "false", ALLOW_ANY_DEV_OTP: "false", COOKIE_SECURE: "true", FRONTEND_ORIGIN: "https://shop.example.com", JWT_SECRET: randomBytes(32).toString("hex"), OTP_HASH_SECRET: randomBytes(32).toString("hex"), ...overrides },
   });
   const result = await probe({});
   assert.equal(result.status, 0, result.stderr);
   const parsed = JSON.parse(result.stdout);
   assert.equal(parsed.mockEnabled, false);
+  assert.equal(parsed.allowAnyDevOtp, false);
   assert(parsed.options.every((value: { secure: boolean; httpOnly: boolean }) => value.secure && value.httpOnly));
   assert.notEqual((await probe({ COOKIE_SECURE: "false" })).status, 0);
   assert.notEqual((await probe({ OTP_PROVIDER: "mock" })).status, 0);
   assert.notEqual((await probe({ ENABLE_MOCK_OTP_RETRIEVAL: "true" })).status, 0);
+  assert.notEqual((await probe({ ALLOW_ANY_DEV_OTP: "true" })).status, 0);
   assert.notEqual((await probe({ NODE_ENV: "development", COOKIE_SECURE: "false", COOKIE_SAME_SITE: "none" })).status, 0);
   for (const overrides of [
     { FRONTEND_ORIGIN: "http://shop.example.com" }, { JWT_SECRET: "replace-with-secure-jwt-secret-value" },
@@ -376,7 +438,7 @@ test("production cookies require Secure; mock flags parse correctly and producti
 test("actual application startup rejects mock OTP in production", async () => {
   const result = await runNode( ["--import", "tsx", "src/server.ts"], {
     encoding: "utf8", timeout: 10000,
-    env: { ...process.env, NODE_ENV: "production", OTP_PROVIDER: "mock", ENABLE_MOCK_OTP_RETRIEVAL: "false", COOKIE_SECURE: "true" },
+    env: { ...process.env, NODE_ENV: "production", OTP_PROVIDER: "mock", ENABLE_MOCK_OTP_RETRIEVAL: "false", ALLOW_ANY_DEV_OTP: "false", COOKIE_SECURE: "true" },
   });
   assert.equal(result.error, undefined);
   assert.equal(result.status, 1);
@@ -636,7 +698,7 @@ test("resend cooldown survives consumption; resend invalidates old challenges an
   const response = await request("/otp/request", "", { phone: ` ${phone.slice(0, 3)} (${phone.slice(3, 7)})-${phone.slice(7)} ` });
   assert.equal(response.status, 200);
   const data = (await response.json()).data;
-  assert(new Date(data.resendAvailableAt).getTime() > Date.now());
+  assert.deepEqual(Object.keys(data), ["challengeId"]);
   assert.equal((await request("/otp/request", "", { phone })).status, 429);
   await prisma.otpChallenge.update({ where: { id: data.challengeId }, data: { consumedAt: new Date() } });
   assert.equal((await request("/otp/request", "", { phone })).status, 429);

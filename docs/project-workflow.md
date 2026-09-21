@@ -55,9 +55,9 @@ The implemented login method is OTP-based phone or email authentication.
 
 1. Client requests an OTP using `/api/auth/otp/request`.
 2. Backend validates the phone/email and creates an OTP challenge.
-3. In local development, the mock OTP provider can expose the OTP only when
-   mock retrieval is explicitly enabled.
-4. Client verifies the OTP using `/api/auth/otp/verify`.
+3. In local development, when `NODE_ENV=development`, `OTP_PROVIDER=mock` and
+   `ALLOW_ANY_DEV_OTP=true`, any six-digit numeric OTP is accepted for that challenge.
+4. Client verifies the OTP using `/api/auth/otp/verify` with `challengeId` and `otp`.
 5. Backend consumes the OTP challenge, creates or finds the user, assigns the
    BUYER role for new users and creates an auth session.
 6. Access and refresh tokens are sent as HttpOnly cookies.
@@ -118,7 +118,7 @@ Deployment should follow this sequence:
 7. Use `/api/ready` as the readiness probe.
 
 Production is blocked until a real SMS/email OTP provider is implemented. The
-current mock provider is only for local development and testing.
+current mock provider and `ALLOW_ANY_DEV_OTP` are only for local development and testing.
 
 ## 8. How to explain this to a manager
 
@@ -147,4 +147,3 @@ If asked what is pending:
 Real SMS/email OTP delivery, Google login, staff/admin login, seller onboarding,
 product listings, orders, payments and frontend integration are pending.
 ```
-

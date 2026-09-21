@@ -11,7 +11,8 @@ const emailInput = z.strictObject({ email: emailSchema, channel: z.literal("EMAI
 
 export const requestOtpBodySchema = z.union([phoneInput, emailInput]);
 const verification = { challengeId: z.uuid(), otp: z.string().trim().regex(/^\d{6}$/, "OTP must contain exactly 6 digits") };
-export const verifyOtpBodySchema = z.union([phoneInput.extend(verification), emailInput.extend(verification)]);
+const challengeOnlyVerification = z.strictObject(verification);
+export const verifyOtpBodySchema = z.union([challengeOnlyVerification, phoneInput.extend(verification), emailInput.extend(verification)]);
 export const mockOtpParamsSchema = z.object({ challengeId: z.uuid() });
 
 export type RequestOtpBody = z.infer<typeof requestOtpBodySchema>;

@@ -136,6 +136,9 @@ const envSchema = z.object({
   ENABLE_MOCK_OTP_RETRIEVAL: z.enum(["true", "false"])
     .default("false").transform((value) => value === "true"),
 
+  ALLOW_ANY_DEV_OTP: z.enum(["true", "false"])
+    .default("false").transform((value) => value === "true"),
+
   OTP_PROVIDER: z
     .enum(["mock", "sms"])
     .default("mock"),
@@ -171,6 +174,17 @@ if (
 ) {
   console.error(
     "ENABLE_MOCK_OTP_RETRIEVAL cannot be true in production.",
+  );
+
+  process.exit(1);
+}
+
+if (
+  result.data.NODE_ENV === "production" &&
+  result.data.ALLOW_ANY_DEV_OTP
+) {
+  console.error(
+    "ALLOW_ANY_DEV_OTP cannot be true in production.",
   );
 
   process.exit(1);
