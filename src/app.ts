@@ -6,6 +6,7 @@ import { errorHandler } from "./middleware/error.middleware.js";
 import { notFound } from "./middleware/not-found.middleware.js";
 import { requestLogger } from "./middleware/request-logger.middleware.js";
 import authRoutes from "./modules/auth/auth.routes.js";
+import userRoutes from "./modules/users/user.routes.js";
 import { env } from "./config/env.js";
 import { prisma } from "./config/database.js";
 import { HttpError } from "./shared/errors/http-error.js";
@@ -21,6 +22,7 @@ app.use(csrfProtection);
 app.use(express.json({ limit: "16kb" }));
 app.use(cookieParser());
 app.use("/api/auth", authRoutes);
+app.use("/api/users", userRoutes);
 
 app.get("/api/health", (_req, res) => {
   res.setHeader("Cache-Control", "no-store");

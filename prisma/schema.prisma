@@ -45,6 +45,8 @@ enum SessionContext {
 model User {
   id                 String              @id @default(uuid()) @db.Uuid
   name               String?
+  profileImage       String?
+  addresses          UserAddress[]
   status             UserStatus          @default(ACTIVE)
   createdAt          DateTime            @default(now()) @db.Timestamptz(6)
   updatedAt          DateTime            @updatedAt @db.Timestamptz(6)
@@ -53,6 +55,25 @@ model User {
   passwordCredential PasswordCredential?
   otpChallenges      OtpChallenge[]
   sessions           AuthSession[]
+}
+
+model UserAddress {
+  id            String   @id @default(uuid()) @db.Uuid
+  userId        String   @db.Uuid
+  recipientName String
+  contactPhone  String
+  addressLine1  String
+  addressLine2  String?
+  city          String
+  state         String
+  postalCode    String
+  country       String
+  isDefault     Boolean  @default(false)
+  createdAt     DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt     DateTime @updatedAt @db.Timestamptz(6)
+  user          User     @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@index([userId])
 }
 
 model Role {

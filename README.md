@@ -41,6 +41,26 @@ is rejected. Each test run creates and removes only its own unique schema. The e
 server's maintenance database. Its credentials are exclusively for local testing.
 Do not run this helper against a deployment database. Lint is not configured.
 
+## Buyer profile and addresses
+
+See [Buyer Profile & Address API](docs/users-api.md) for request bodies, validation,
+responses and default-address rules. All endpoints require an active authenticated session.
+
+| Method | Endpoint |
+| --- | --- |
+| GET, PATCH | `/api/users/me` |
+| GET, POST | `/api/users/me/addresses` |
+| PATCH, DELETE | `/api/users/me/addresses/:addressId` |
+| PATCH | `/api/users/me/addresses/:addressId/default` |
+
+Profile updates accept only `name` and optional `profileImage`. Verified identities,
+credentials, roles and status stay outside profile updates. Addresses belong to the
+authenticated user; a transaction and database unique index enforce at most one default.
+Deleting the default leaves no default selected.
+
+Migration: `20260922000000_buyer_profile_addresses`. Apply migrations and generate the
+Prisma client using the local setup steps above.
+
 ## Authentication and deployment
 
 See [API contracts and security policy](docs/auth-api.md) and

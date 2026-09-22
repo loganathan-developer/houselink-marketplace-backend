@@ -1,5 +1,6 @@
 import { config, parse } from "dotenv";
 import assert from "node:assert/strict";
+import { stripVTControlCharacters } from "node:util";
 import { after, before, beforeEach, test } from "node:test";
 import { randomBytes, randomUUID } from "node:crypto";
 import { readFile, readdir } from "node:fs/promises";
@@ -151,6 +152,141 @@ async function login(phone = `+91${++phoneNumber}`) {
   const body = await response.json();
   return { ...cookies(response), challengeId: id, userId: body.data.user.id as string, phone, body, sessionId: decodeJwt(cookies(response).access).sid as string };
 }
+
+async function userRequest(path: string, cookie = "", body?: unknown, method = body === undefined ? "GET" : "POST") {
+  return fetch(`${base}/api/users/me${path}`, { method,
+    headers: { ...csrf, Cookie: cookie, "Content-Type": "application/json" },
+    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+  });
+}
+const sampleAddress = { recipientName: "Buyer", contactPhone: "+918765445278", addressLine1: "12 Main Street", city: "Chennai", state: "Tamil Nadu", postalCode: "600001", country: "IN" };
+
+test("buyer profile get/update exposes only profile data and rejects protected fields", async () => {
+  const auth = await login();
+  const initial = await userRequest("", auth.cookie);
+  assert.equal(initial.status, 200);
+  const initialUser = (await initial.json()).data.user;
+  assert.equal(initialUser.id, auth.userId);
+  assert.deepEqual(Object.keys(initialUser).sort(), ["createdAt", "id", "name", "profileImage", "updatedAt"]);
+  const protectedState = () => prisma.user.findUniqueOrThrow({ where: { id: auth.userId }, select: {
+    status: true, roles: true, identities: true, passwordCredential: true,
+  } });
+  const originalProtectedState = await protectedState();
+  const updated = await userRequest("", auth.cookie, { name: " Buyer Name ", profileImage: "https://example.com/avatar.png" }, "PATCH");
+  assert.equal(updated.status, 200);
+  assert.equal((await updated.json()).data.user.name, "Buyer Name");
+  for (const field of ["roles", "status", "phone", "email", "verifiedAt", "AuthIdentity", "identities", "passwordCredential", "password", "userId"]) {
+    assert.equal((await userRequest("", auth.cookie, { name: "Changed", [field]: "forbidden" }, "PATCH")).status, 400);
+  }
+  for (const body of [{}, { name: " " }, { profileImage: "javascript:alert(1)" }]) {
+    assert.equal((await userRequest("", auth.cookie, body, "PATCH")).status, 400);
+  }
+  assert.equal((await prisma.user.findUniqueOrThrow({ where: { id: auth.userId } })).name, "Buyer Name");
+  const saved = (await (await userRequest("", auth.cookie)).json()).data.user;
+  assert.equal(saved.name, "Buyer Name");
+  assert.equal(saved.profileImage, "https://example.com/avatar.png");
+  assert.deepEqual(await protectedState(), originalProtectedState);
+  assert.equal((await userRequest("", auth.cookie, { profileImage: null }, "PATCH")).status, 200);
+  assert.equal((await prisma.user.findUniqueOrThrow({ where: { id: auth.userId } })).profileImage, null);
+});
+
+test("buyer addresses CRUD, relation, default replacement and default deletion", async () => {
+  const auth = await login();
+  const create = async (isDefault: boolean) => {
+    const response = await userRequest("/addresses", auth.cookie, { ...sampleAddress, isDefault });
+    assert.equal(response.status, 201, await response.clone().text());
+    return (await response.json()).data.address.id as string;
+  };
+  const first = await create(true), second = await create(true);
+  assert.equal(await prisma.userAddress.count({ where: { userId: auth.userId, isDefault: true } }), 1);
+  assert.equal((await prisma.userAddress.findUniqueOrThrow({ where: { id: first } })).isDefault, false);
+  const user = await prisma.user.findUniqueOrThrow({ where: { id: auth.userId }, include: { addresses: true } });
+  assert.equal(user.addresses.length, 2);
+  assert.equal((await (await userRequest("/addresses", auth.cookie)).json()).data.addresses.length, 2);
+  assert.equal((await userRequest(`/addresses/${first}`, auth.cookie, { city: "Madurai" }, "PATCH")).status, 200);
+  assert.equal((await prisma.userAddress.findUniqueOrThrow({ where: { id: first } })).city, "Madurai");
+  const concurrent = await Promise.all([first, second].map(id => userRequest(`/addresses/${id}/default`, auth.cookie, {}, "PATCH")));
+  assert.deepEqual(concurrent.map(r => r.status), [200, 200]);
+  assert.equal(await prisma.userAddress.count({ where: { userId: auth.userId, isDefault: true } }), 1);
+  assert.equal((await userRequest(`/addresses/${first}/default`, auth.cookie, {}, "PATCH")).status, 200);
+  assert.equal((await prisma.userAddress.findUniqueOrThrow({ where: { id: first } })).isDefault, true);
+  assert.equal((await prisma.userAddress.findUniqueOrThrow({ where: { id: second } })).isDefault, false);
+  assert.equal((await userRequest(`/addresses/${first}`, auth.cookie, undefined, "DELETE")).status, 204);
+  assert.equal(await prisma.userAddress.findUnique({ where: { id: first } }), null);
+  assert.deepEqual((await (await userRequest("/addresses", auth.cookie)).json()).data.addresses.map((address: { id: string }) => address.id), [second]);
+  assert.equal(await prisma.userAddress.count({ where: { userId: auth.userId, isDefault: true } }), 0);
+  assert.equal((await userRequest(`/addresses/${first}`, auth.cookie, {}, "DELETE")).status, 404);
+});
+
+test("foreign addresses and unknown IDs are inaccessible; address validation is strict", async () => {
+  const owner = await login(), other = await login();
+  const response = await userRequest("/addresses", owner.cookie, { ...sampleAddress, isDefault: true });
+  const id = (await response.json()).data.address.id;
+  assert.deepEqual((await (await userRequest("/addresses", other.cookie)).json()).data.addresses, []);
+  for (const addressId of [id, randomUUID()]) {
+    assert.equal((await userRequest(`/addresses/${addressId}`, other.cookie, { city: "Other" }, "PATCH")).status, 404);
+    assert.equal((await userRequest(`/addresses/${addressId}/default`, other.cookie, {}, "PATCH")).status, 404);
+    assert.equal((await userRequest(`/addresses/${addressId}`, other.cookie, undefined, "DELETE")).status, 404);
+  }
+  for (const patch of [{ userId: other.userId }, { contactPhone: "123" }, { country: "India" }, { postalCode: "!" }, { recipientName: "" }, { addressLine1: "" }, { city: "" }, { state: "" }, { addressLine2: 3 }, { isDefault: "true" }]) {
+    assert.equal((await userRequest("/addresses", owner.cookie, { ...sampleAddress, ...patch })).status, 400);
+  }
+  assert.equal((await userRequest("/addresses/not-uuid", owner.cookie, { city: "Other" }, "PATCH")).status, 400);
+  assert.equal((await userRequest(`/addresses/${id}`, owner.cookie, {}, "PATCH")).status, 400);
+  assert.equal((await prisma.userAddress.findUniqueOrThrow({ where: { id } })).isDefault, true);
+});
+
+test("invalid profile types and lengths reject without changing persisted data", async () => {
+  const auth = await login();
+  const before = await prisma.user.findUniqueOrThrow({ where: { id: auth.userId } });
+  for (const body of [{ name: null }, { name: 123 }, { name: "a".repeat(101) }, { profileImage: 123 }, { profileImage: "not-a-url" }, { profileImage: "http://example.com/image.png" }, []]) {
+    const response = await userRequest("", auth.cookie, body, "PATCH");
+    assert.equal(response.status, 400);
+    assert.equal((await response.json()).error.code, "VALIDATION_ERROR");
+  }
+  assert.deepEqual(await prisma.user.findUniqueOrThrow({ where: { id: auth.userId } }), before);
+});
+
+test("all address mutations reject malformed UUIDs without changing addresses", async () => {
+  const auth = await login();
+  const address = await prisma.userAddress.create({ data: { ...sampleAddress, userId: auth.userId, isDefault: true } });
+  for (const id of ["not-uuid", "123", "00000000-0000-0000-0000-00000000000Z"]) {
+    for (const [suffix, method, body] of [["", "PATCH", { city: "Other" }], ["", "DELETE", undefined], ["/default", "PATCH", {}]] as const) {
+      const response = await userRequest(`/addresses/${id}${suffix}`, auth.cookie, body, method);
+      assert.equal(response.status, 400);
+      assert.equal((await response.json()).error.code, "VALIDATION_ERROR");
+    }
+  }
+  assert.deepEqual(await prisma.userAddress.findMany({ where: { userId: auth.userId } }), [address]);
+});
+
+test("default address changes stay within the owner and address PATCH rejects userId", async () => {
+  const owner = await login(), other = await login();
+  const first = await prisma.userAddress.create({ data: { ...sampleAddress, userId: owner.userId, isDefault: true } });
+  const second = await prisma.userAddress.create({ data: { ...sampleAddress, userId: owner.userId } });
+  const foreign = await prisma.userAddress.create({ data: { ...sampleAddress, userId: other.userId, isDefault: true } });
+  const response = await userRequest(`/addresses/${second.id}`, owner.cookie, { isDefault: true }, "PATCH");
+  assert.equal(response.status, 200);
+  assert.equal((await response.json()).data.address.isDefault, true);
+  assert.equal((await prisma.userAddress.findUniqueOrThrow({ where: { id: first.id } })).isDefault, false);
+  assert.equal(await prisma.userAddress.count({ where: { userId: owner.userId, isDefault: true } }), 1);
+  assert.deepEqual(await prisma.userAddress.findUniqueOrThrow({ where: { id: foreign.id } }), foreign);
+  const before = await prisma.userAddress.findUniqueOrThrow({ where: { id: second.id } });
+  assert.equal((await userRequest(`/addresses/${second.id}`, owner.cookie, { userId: other.userId, city: "Changed" }, "PATCH")).status, 400);
+  assert.deepEqual(await prisma.userAddress.findUniqueOrThrow({ where: { id: second.id } }), before);
+});
+
+test("all user routes reject unauthenticated, blocked and deleted users", async () => {
+  const auth = await login();
+  const id = randomUUID();
+  for (const status of ["anonymous", "BLOCKED", "DELETED"] as const) {
+    if (status !== "anonymous") await prisma.user.update({ where: { id: auth.userId }, data: { status } });
+    const cookie = status === "anonymous" ? "" : auth.cookie;
+    for (const [path, method, body] of [["", "GET", undefined], ["", "PATCH", { name: "Test" }], ["/addresses", "GET", undefined], ["/addresses", "POST", sampleAddress], [`/addresses/${id}`, "PATCH", { city: "Test" }], [`/addresses/${id}`, "DELETE", undefined], [`/addresses/${id}/default`, "PATCH", {}]] as const) {
+      assert.equal((await userRequest(path, cookie, body, method)).status, 401);
+    }
+  }
+});
 
 async function challenge(phone = `+91${++phoneNumber}`) {
   const id = randomUUID();
@@ -786,5 +922,5 @@ test("mock route is not mounted when disabled and rejects non-loopback access", 
     encoding: "utf8", timeout: 15000, env: { ...process.env, ENABLE_MOCK_OTP_RETRIEVAL: "false" },
   });
   assert.equal(result.status, 0, result.stderr);
-  assert.equal(result.stdout.trim(), "false");
+  assert.equal(stripVTControlCharacters(result.stdout).trim(), "false");
 });
