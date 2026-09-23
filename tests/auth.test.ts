@@ -5,6 +5,7 @@ import { after, before, beforeEach, test } from "node:test";
 import { randomBytes, randomUUID } from "node:crypto";
 import { readFile, readdir } from "node:fs/promises";
 import { testDatabaseUrl } from "./test-database.js";
+import { registerCategoryTests } from "./categories.scenarios.js";
 import { spawn } from "node:child_process";
 import { setTimeout as delay } from "node:timers/promises";
 import pg from "pg";
@@ -91,7 +92,7 @@ before(async () => {
       await client.query(await readFile(new URL(`${entry.name}/migration.sql`, migrations), "utf8"));
     }
   } finally { client.release(); }
-  await prisma.role.createMany({ data: [{ code: "BUYER" }, { code: "ADMIN" }] });
+  await prisma.role.createMany({ data: [{ code: "BUYER" }, { code: "ADMIN" }, { code: "SELLER" }] });
   server = app.listen(0, "127.0.0.1");
   await new Promise<void>((resolve) => server.once("listening", resolve));
   const address = server.address();
@@ -910,6 +911,18 @@ test("invalid, unknown and oversized refresh tokens are rejected", async () => {
     assert.equal(response.status, 401);
     assert.deepEqual(response.headers.getSetCookie(), []);
   }
+});
+
+registerCategoryTests({
+  prisma, login, race: raceAtDatabaseLock,
+  sendWithoutCsrf: (path, cookie = "", body, method = "POST") => fetch(`${base}/api${path}`, {
+    method, headers: { Origin: env.FRONTEND_ORIGIN, Cookie: cookie, "Content-Type": "application/json" },
+    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+  }),
+  send: (path, cookie = "", body, method = body === undefined ? "GET" : "POST") => fetch(`${base}/api${path}`, {
+    method, headers: { ...csrf, Cookie: cookie, "Content-Type": "application/json" },
+    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+  }),
 });
 
 test("mock route is not mounted when disabled and rejects non-loopback access", async () => {

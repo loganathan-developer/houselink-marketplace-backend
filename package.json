@@ -12,7 +12,8 @@
     "build": "tsc",
     "start": "node --enable-source-maps dist/server.js",
     "typecheck": "tsc --noEmit",
-    "seed:roles": "tsx prisma/seed.ts"
+    "seed:roles": "tsx prisma/seed.ts",
+    "seed:categories": "tsx prisma/seed-categories.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

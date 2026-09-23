@@ -61,6 +61,20 @@ Deleting the default leaves no default selected.
 Migration: `20260922000000_buyer_profile_addresses`. Apply migrations and generate the
 Prisma client using the local setup steps above.
 
+## Categories and subcategories
+
+See [Category API](docs/categories-api.md) for public browsing, trees and breadcrumbs,
+and protected admin creation, updates, moves, ordering and activation.
+
+Public: `GET /api/categories`, `/api/categories/tree`, `/api/categories/slug/:slug`,
+`/api/categories/:categoryId`. Admin: `GET/POST /api/admin/categories` and
+`GET/PATCH /api/admin/categories/:categoryId`.
+
+Visibility requires active ancestors. Hierarchy changes are serialized to prevent cycles;
+nesting is limited to 64 levels. Admin access retains the existing STAFF/MFA requirement.
+After migrations and client generation, `npm run seed:categories` optionally adds
+repeatable development-only samples without overwriting admin edits.
+
 ## Authentication and deployment
 
 See [API contracts and security policy](docs/auth-api.md) and

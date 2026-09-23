@@ -62,8 +62,9 @@ All auth responses include `Cache-Control: no-store`. Errors use the existing
 | POST | /api/auth/logout-all | Valid access cookie; any role | No body required | 200 success + cleared cookies | 401, 403, 429 | Customer API |
 | GET | /api/auth/otp/mock/:challengeId | Loopback client, no role | UUID path parameter | 200 destination, otp, expiresAt | 400, 403, 404, 429 | Mounted only in development/test with mock provider + explicit opt-in |
 
-No user, Google, admin, identity-linking or marketplace APIs are mounted. User module
-files are placeholders. No Postman collection was present. All auth routes share IP
+Buyer profile and address APIs are mounted under `/api/users`; see [users API](users-api.md).
+Category browsing and protected admin management are mounted; see [categories API](categories-api.md).
+Google login, staff login, identity linking and product/order APIs are not mounted. All auth routes share IP
 limits. Mutations require the CSRF header plus trusted Origin/Referer. Every route may
 return a generic 500 for unexpected failures; malformed JSON is 400 and bodies over
 16 KiB are 413. Query parameters are unused and never supply credentials or roles.
@@ -121,7 +122,7 @@ Email login returns `email` instead of `phone` in the safe user object.
 The /me response contains only `data.user.id`, `data.user.name`, `data.user.status` (ACTIVE), and `data.user.roles`.
 Invalid credentials, blocked/deleted users, and expired/revoked sessions return 401.
 Authenticated role failures return 403. CSRF/origin failures return 403.
-Rate limits return 429; IP limits include Retry-After. OTP request success includes resendAvailableAt. Logout without credentials is idempotent.
+Rate limits return 429; IP limits include Retry-After. OTP request success returns only data.challengeId. Logout without credentials is idempotent.
 
 Mock retrieval requires development/test, OTP_PROVIDER=mock,
 ENABLE_MOCK_OTP_RETRIEVAL=true, and a loopback client address. Request an OTP first,
@@ -182,7 +183,7 @@ protected request. requireRole and requireAnyRole deny by default. ADMIN additio
 requires a STAFF session with mfaVerifiedAt; a customer OTP session cannot authorize
 ADMIN even if that account already has the role. No staff login endpoint is implemented. Resource ownership
 must be enforced in resource service queries using both resource ID and owner ID.
-There are currently no product/resource handlers in this repository to apply it to.
+Buyer address handlers enforce resource ownership; category management uses the existing admin authorization policy.
 
 Cookie configuration: COOKIE_SAME_SITE and optional COOKIE_SECURE.
 Production also requires an HTTPS frontend and independent non-placeholder secrets.
