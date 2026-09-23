@@ -42,6 +42,14 @@ enum SessionContext {
   STAFF
 }
 
+enum AttributeType {
+  SELECT
+  MULTI_SELECT
+  TEXT
+  NUMBER
+  BOOLEAN
+}
+
 model User {
   id                 String              @id @default(uuid()) @db.Uuid
   name               String?
@@ -77,20 +85,70 @@ model UserAddress {
 }
 
 model Category {
-  id          String     @id @default(uuid()) @db.Uuid
+  id          String              @id @default(uuid()) @db.Uuid
   name        String
-  slug        String     @unique
+  slug        String              @unique
   description String?
   imageUrl    String?
-  parentId    String?    @db.Uuid
-  parent      Category?  @relation("CategoryHierarchy", fields: [parentId], references: [id], onDelete: Restrict)
-  children    Category[] @relation("CategoryHierarchy")
-  isActive    Boolean    @default(true)
-  sortOrder   Int        @default(0)
-  createdAt   DateTime   @default(now()) @db.Timestamptz(6)
-  updatedAt   DateTime   @updatedAt @db.Timestamptz(6)
+  parentId    String?             @db.Uuid
+  parent      Category?           @relation("CategoryHierarchy", fields: [parentId], references: [id], onDelete: Restrict)
+  children    Category[]          @relation("CategoryHierarchy")
+  attributes  CategoryAttribute[]
+  isActive    Boolean             @default(true)
+  sortOrder   Int                 @default(0)
+  createdAt   DateTime            @default(now()) @db.Timestamptz(6)
+  updatedAt   DateTime            @updatedAt @db.Timestamptz(6)
 
   @@index([parentId, sortOrder])
+  @@index([isActive])
+}
+
+model Attribute {
+  id         String              @id @default(uuid()) @db.Uuid
+  name       String
+  code       String              @unique
+  type       AttributeType
+  isActive   Boolean             @default(true)
+  createdAt  DateTime            @default(now()) @db.Timestamptz(6)
+  updatedAt  DateTime            @updatedAt @db.Timestamptz(6)
+  values     AttributeValue[]
+  categories CategoryAttribute[]
+
+  @@index([isActive])
+}
+
+model AttributeValue {
+  id          String    @id @default(uuid()) @db.Uuid
+  attributeId String    @db.Uuid
+  value       String
+  label       String
+  sortOrder   Int       @default(0)
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt   DateTime  @updatedAt @db.Timestamptz(6)
+  attribute   Attribute @relation(fields: [attributeId], references: [id], onDelete: Restrict)
+
+  @@unique([attributeId, value])
+  @@index([attributeId, sortOrder])
+  @@index([isActive])
+}
+
+model CategoryAttribute {
+  categoryId      String    @db.Uuid
+  attributeId     String    @db.Uuid
+  isRequired      Boolean   @default(false)
+  isFilterable    Boolean   @default(true)
+  isVariantOption Boolean   @default(false)
+  sortOrder       Int       @default(0)
+  isActive        Boolean   @default(true)
+  createdAt       DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt       DateTime  @updatedAt @db.Timestamptz(6)
+  category        Category  @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  attribute       Attribute @relation(fields: [attributeId], references: [id], onDelete: Restrict)
+
+  @@id([categoryId, attributeId])
+  @@index([attributeId])
+  @@index([categoryId, sortOrder])
   @@index([isActive])
 }
 

@@ -16,6 +16,7 @@ export function registerCategoryTests(deps: {
   const { prisma, send } = deps;
   const scenario = (name: string, run: () => Promise<void>) => test(`categories: ${name}`, async () => {
     // This client points at the unique isolated test schema created by auth.test.ts.
+    await prisma.categoryAttribute.deleteMany();
     await prisma.category.deleteMany();
     await run();
   });

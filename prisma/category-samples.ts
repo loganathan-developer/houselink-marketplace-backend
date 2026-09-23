@@ -13,6 +13,15 @@ const samples: [string, string, number | null][] = [
   ["Beauty", "beauty", null], ["Makeup", "beauty-makeup", 14], ["Lipstick", "beauty-makeup-lipstick", 15],
 ];
 
+const tshirtAttributes = [
+  { name: "Size", code: "size", sortOrder: 1, isRequired: true, isVariantOption: true, values: [["s", "S"], ["m", "M"], ["l", "L"], ["xl", "XL"]] },
+  { name: "Color", code: "color", sortOrder: 2, isRequired: true, isVariantOption: true, values: [["black", "Black"], ["white", "White"], ["blue", "Blue"], ["red", "Red"]] },
+  { name: "Fabric", code: "fabric", sortOrder: 3, isRequired: true, isVariantOption: false, values: [["cotton", "Cotton"], ["polyester", "Polyester"], ["linen", "Linen"]] },
+  { name: "Fit", code: "fit", sortOrder: 4, isRequired: true, isVariantOption: false, values: [["slim", "Slim"], ["regular", "Regular"], ["oversized", "Oversized"]] },
+  { name: "Pattern", code: "pattern", sortOrder: 5, isRequired: false, isVariantOption: false, values: [["solid", "Solid"], ["printed", "Printed"], ["striped", "Striped"], ["checked", "Checked"]] },
+  { name: "Sleeve Length", code: "sleeve_length", sortOrder: 6, isRequired: false, isVariantOption: false, values: [["half_sleeve", "Half Sleeve"], ["full_sleeve", "Full Sleeve"], ["sleeveless", "Sleeveless"]] },
+] as const;
+
 export async function seedCategorySamples() {
   if (env.NODE_ENV === "production") throw new Error("Sample categories are development data only");
   await prisma.$transaction(async tx => {
@@ -33,6 +42,39 @@ export async function seedCategorySamples() {
       }
       await tx.category.create({ data: { id, name, slug, parentId, sortOrder: index } });
       ids[index] = id;
+    }
+    const tshirts = await tx.category.findUnique({ where: { id: "d5000000-0000-4000-8000-000000000003" }, select: { id: true } }) ??
+      await tx.category.findFirst({
+        where: { slug: "men-topwear-tshirts", parent: { slug: "men-topwear", parent: { slug: "men" } } },
+        select: { id: true },
+      });
+    if (!tshirts) throw new Error("Cannot seed T-Shirt attributes: expected Men > Topwear > T-Shirts category is missing");
+    for (const item of tshirtAttributes) {
+      const attribute = await tx.attribute.upsert({
+        where: { code: item.code },
+        update: {},
+        create: { name: item.name, code: item.code, type: "SELECT", isActive: true },
+      });
+      for (const [index, [value, label]] of item.values.entries()) {
+        await tx.attributeValue.upsert({
+          where: { attributeId_value: { attributeId: attribute.id, value } },
+          update: {},
+          create: { attributeId: attribute.id, value, label, sortOrder: index + 1, isActive: true },
+        });
+      }
+      await tx.categoryAttribute.upsert({
+        where: { categoryId_attributeId: { categoryId: tshirts.id, attributeId: attribute.id } },
+        update: {},
+        create: {
+          categoryId: tshirts.id,
+          attributeId: attribute.id,
+          isRequired: item.isRequired,
+          isFilterable: true,
+          isVariantOption: item.isVariantOption,
+          sortOrder: item.sortOrder,
+          isActive: true,
+        },
+      });
     }
   }, { timeout: 15000 });
 }

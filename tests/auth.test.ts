@@ -6,6 +6,7 @@ import { randomBytes, randomUUID } from "node:crypto";
 import { readFile, readdir } from "node:fs/promises";
 import { testDatabaseUrl } from "./test-database.js";
 import { registerCategoryTests } from "./categories.scenarios.js";
+import { registerAttributeTests } from "./attributes.scenarios.js";
 import { spawn } from "node:child_process";
 import { setTimeout as delay } from "node:timers/promises";
 import pg from "pg";
@@ -915,6 +916,18 @@ test("invalid, unknown and oversized refresh tokens are rejected", async () => {
 
 registerCategoryTests({
   prisma, login, race: raceAtDatabaseLock,
+  sendWithoutCsrf: (path, cookie = "", body, method = "POST") => fetch(`${base}/api${path}`, {
+    method, headers: { Origin: env.FRONTEND_ORIGIN, Cookie: cookie, "Content-Type": "application/json" },
+    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+  }),
+  send: (path, cookie = "", body, method = body === undefined ? "GET" : "POST") => fetch(`${base}/api${path}`, {
+    method, headers: { ...csrf, Cookie: cookie, "Content-Type": "application/json" },
+    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+  }),
+});
+
+registerAttributeTests({
+  prisma, login,
   sendWithoutCsrf: (path, cookie = "", body, method = "POST") => fetch(`${base}/api${path}`, {
     method, headers: { Origin: env.FRONTEND_ORIGIN, Cookie: cookie, "Content-Type": "application/json" },
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),

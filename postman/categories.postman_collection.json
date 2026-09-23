@@ -49,6 +49,16 @@
       "type": "string"
     },
     {
+      "key": "attributeId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "valueId",
+      "value": "",
+      "type": "string"
+    },
+    {
       "key": "enableAdminRequests",
       "value": "false",
       "type": "string"
@@ -538,6 +548,103 @@
           ]
         }
       ]
+    },
+    {
+      "name": "D. Day 6 - Category attributes",
+      "item": [
+        {
+          "name": "1. Public category attributes",
+          "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/api/categories/{{categoryId}}/attributes" },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));"] } }]
+        },
+        {
+          "name": "2. Admin list attributes",
+          "request": { "method": "GET", "header": [{ "key": "Origin", "value": "{{frontendOrigin}}" }], "url": "{{baseUrl}}/api/admin/attributes?page=1&limit=20" }
+        },
+        {
+          "name": "3. Admin create attribute",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-CSRF-Protection", "value": "1" },
+              { "key": "Origin", "value": "{{frontendOrigin}}" }
+            ],
+            "url": "{{baseUrl}}/api/admin/attributes",
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Postman Attribute\",\n  \"code\": \"postman_{{$guid}}\",\n  \"type\": \"SELECT\"\n}", "options": { "raw": { "language": "json" } } }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["if (pm.response.code === 201) pm.collectionVariables.set('attributeId', pm.response.json().data.attribute.id);"] } }]
+        },
+        {
+          "name": "4. Admin create attribute value",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-CSRF-Protection", "value": "1" },
+              { "key": "Origin", "value": "{{frontendOrigin}}" }
+            ],
+            "url": "{{baseUrl}}/api/admin/attributes/{{attributeId}}/values",
+            "body": { "mode": "raw", "raw": "{\n  \"value\": \"cotton\",\n  \"label\": \"Cotton\",\n  \"sortOrder\": 1\n}", "options": { "raw": { "language": "json" } } }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["if (pm.response.code === 201) pm.collectionVariables.set('valueId', pm.response.json().data.value.id);"] } }]
+        },
+        {
+          "name": "5. Admin update attribute value",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-CSRF-Protection", "value": "1" },
+              { "key": "Origin", "value": "{{frontendOrigin}}" }
+            ],
+            "url": "{{baseUrl}}/api/admin/attributes/{{attributeId}}/values/{{valueId}}",
+            "body": { "mode": "raw", "raw": "{\n  \"label\": \"Pure Cotton\",\n  \"sortOrder\": 2,\n  \"isActive\": true\n}", "options": { "raw": { "language": "json" } } }
+          }
+        },
+        {
+          "name": "6. Admin map attribute to category",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-CSRF-Protection", "value": "1" },
+              { "key": "Origin", "value": "{{frontendOrigin}}" }
+            ],
+            "url": "{{baseUrl}}/api/admin/categories/{{categoryId}}/attributes",
+            "body": { "mode": "raw", "raw": "{\n  \"attributeId\": \"{{attributeId}}\",\n  \"isRequired\": true,\n  \"isFilterable\": true,\n  \"isVariantOption\": false,\n  \"sortOrder\": 3\n}", "options": { "raw": { "language": "json" } } }
+          }
+        },
+        {
+          "name": "7. Admin list category attributes",
+          "request": { "method": "GET", "header": [{ "key": "Origin", "value": "{{frontendOrigin}}" }], "url": "{{baseUrl}}/api/admin/categories/{{categoryId}}/attributes" }
+        },
+        {
+          "name": "8. Admin update category mapping",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-CSRF-Protection", "value": "1" },
+              { "key": "Origin", "value": "{{frontendOrigin}}" }
+            ],
+            "url": "{{baseUrl}}/api/admin/categories/{{categoryId}}/attributes/{{attributeId}}",
+            "body": { "mode": "raw", "raw": "{\n  \"isRequired\": false,\n  \"sortOrder\": 5\n}", "options": { "raw": { "language": "json" } } }
+          }
+        },
+        {
+          "name": "9. Admin unmap category attribute",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "X-CSRF-Protection", "value": "1" },
+              { "key": "Origin", "value": "{{frontendOrigin}}" }
+            ],
+            "url": "{{baseUrl}}/api/admin/categories/{{categoryId}}/attributes/{{attributeId}}"
+          }
+        }
+      ],
+      "description": "Real ADMIN manual verification is pending until legitimate staff ADMIN authentication exists. Buyer sessions should receive 403 for these admin requests."
     }
   ]
 }
