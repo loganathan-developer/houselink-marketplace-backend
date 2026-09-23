@@ -64,16 +64,14 @@ Prisma client using the local setup steps above.
 ## Categories and subcategories
 
 See [Category API](docs/categories-api.md) for public browsing, trees and breadcrumbs,
-and protected admin creation, updates, moves, ordering and activation.
+plus public category attributes.
 
 Public: `GET /api/categories`, `/api/categories/tree`, `/api/categories/slug/:slug`,
-`/api/categories/:categoryId`. Admin: `GET/POST /api/admin/categories` and
-`GET/PATCH /api/admin/categories/:categoryId`.
+`/api/categories/:categoryId` and `GET /api/categories/:categoryId/attributes`.
 
-Visibility requires active ancestors. Hierarchy changes are serialized to prevent cycles;
-nesting is limited to 64 levels. Admin access retains the existing STAFF/MFA requirement.
+Visibility requires active ancestors. Nesting is limited to 64 levels.
 After migrations and client generation, `npm run seed:categories` optionally adds
-repeatable development-only samples without overwriting admin edits.
+repeatable development-only samples and the T-Shirt attribute configuration.
 
 ## Authentication and deployment
 

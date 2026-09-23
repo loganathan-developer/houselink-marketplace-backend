@@ -3,7 +3,7 @@
 ## Current scope
 
 Implemented: OTP authentication, cookie sessions, buyer profiles, addresses and categories.
-See [Category API](categories-api.md) for public lists/tree/details and protected admin management.
+See [Category API](categories-api.md) for public lists/tree/details and category attributes.
 Products, cart, orders, payments, Google login and staff login are not implemented.
 Local API: `http://localhost:5000`. Frontend origin: `http://localhost:3000`
 (must match backend `FRONTEND_ORIGIN`). Real SMS/email delivery is not implemented;

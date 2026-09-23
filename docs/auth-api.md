@@ -63,7 +63,7 @@ All auth responses include `Cache-Control: no-store`. Errors use the existing
 | GET | /api/auth/otp/mock/:challengeId | Loopback client, no role | UUID path parameter | 200 destination, otp, expiresAt | 400, 403, 404, 429 | Mounted only in development/test with mock provider + explicit opt-in |
 
 Buyer profile and address APIs are mounted under `/api/users`; see [users API](users-api.md).
-Category browsing and protected admin management are mounted; see [categories API](categories-api.md).
+Category browsing and public category attributes are mounted; see [categories API](categories-api.md).
 Google login, staff login, identity linking and product/order APIs are not mounted. All auth routes share IP
 limits. Mutations require the CSRF header plus trusted Origin/Referer. Every route may
 return a generic 500 for unexpected failures; malformed JSON is 400 and bodies over
@@ -181,9 +181,9 @@ limit. See [Express proxy guidance](https://expressjs.com/en/guide/behind-proxie
 Authentication loads current session/user status and roles from PostgreSQL on every
 protected request. requireRole and requireAnyRole deny by default. ADMIN additionally
 requires a STAFF session with mfaVerifiedAt; a customer OTP session cannot authorize
-ADMIN even if that account already has the role. No staff login endpoint is implemented. Resource ownership
-must be enforced in resource service queries using both resource ID and owner ID.
-Buyer address handlers enforce resource ownership; category management uses the existing admin authorization policy.
+ADMIN even if that account already has the role. No staff login endpoint is implemented.
+Resource ownership must be enforced in resource service queries using both resource ID
+and owner ID. Buyer address handlers enforce resource ownership.
 
 Cookie configuration: COOKIE_SAME_SITE and optional COOKIE_SECURE.
 Production also requires an HTTPS frontend and independent non-placeholder secrets.

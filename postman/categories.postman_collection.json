@@ -1,650 +1,90 @@
 {
   "info": {
-    "name": "HouseLink Category API",
+    "name": "HouseLink Buyer/Public API",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
-    "description": "Public requests disable cookies. Buyer tests use real OTP login. Admin requests are skipped by default: staff login/MFA is not implemented. Do not manually promote a buyer or fabricate credentials. enableAdminRequests only enables collection execution; it grants no server permissions."
+    "description": "Buyer/public runtime checks only. Admin API routes are intentionally not mounted in the current buyer-side scope."
   },
   "auth": {
     "type": "noauth"
   },
   "variable": [
-    {
-      "key": "baseUrl",
-      "value": "http://localhost:5000",
-      "type": "string"
-    },
-    {
-      "key": "frontendOrigin",
-      "value": "http://localhost:3000",
-      "type": "string"
-    },
-    {
-      "key": "categoryId",
-      "value": "",
-      "type": "string"
-    },
-    {
-      "key": "categorySlug",
-      "value": "",
-      "type": "string"
-    },
-    {
-      "key": "buyerPhone",
-      "value": "+918765445278",
-      "type": "string"
-    },
-    {
-      "key": "challengeId",
-      "value": "",
-      "type": "string"
-    },
-    {
-      "key": "otp",
-      "value": "123456",
-      "type": "string"
-    },
-    {
-      "key": "adminCategoryId",
-      "value": "",
-      "type": "string"
-    },
-    {
-      "key": "attributeId",
-      "value": "",
-      "type": "string"
-    },
-    {
-      "key": "valueId",
-      "value": "",
-      "type": "string"
-    },
-    {
-      "key": "enableAdminRequests",
-      "value": "false",
-      "type": "string"
-    }
+    { "key": "baseUrl", "value": "http://localhost:5000", "type": "string" },
+    { "key": "frontendOrigin", "value": "http://localhost:3000", "type": "string" },
+    { "key": "categoryId", "value": "d5000000-0000-4000-8000-000000000003", "type": "string" },
+    { "key": "categorySlug", "value": "men-topwear-tshirts", "type": "string" },
+    { "key": "buyerPhone", "value": "+918765445278", "type": "string" },
+    { "key": "challengeId", "value": "", "type": "string" },
+    { "key": "otp", "value": "123456", "type": "string" }
   ],
   "item": [
     {
-      "name": "A. Public - no login",
+      "name": "Health",
       "item": [
-        {
-          "name": "1. List visible categories",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": "{{baseUrl}}/api/categories?page=1&limit=20"
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
-                  "const first = pm.response.json().data?.categories?.[0];",
-                  "if (first) { pm.collectionVariables.set('categoryId', first.id); pm.collectionVariables.set('categorySlug', first.slug); }"
-                ]
-              }
-            }
-          ],
-          "protocolProfileBehavior": {
-            "disableCookies": true
-          }
-        },
-        {
-          "name": "2. Root categories",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": "{{baseUrl}}/api/categories?rootOnly=true"
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));"
-                ]
-              }
-            }
-          ],
-          "protocolProfileBehavior": {
-            "disableCookies": true
-          }
-        },
-        {
-          "name": "3. Direct children",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": "{{baseUrl}}/api/categories?parentId={{categoryId}}"
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));"
-                ]
-              }
-            }
-          ],
-          "protocolProfileBehavior": {
-            "disableCookies": true
-          }
-        },
-        {
-          "name": "4. Category tree",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": "{{baseUrl}}/api/categories/tree"
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));"
-                ]
-              }
-            }
-          ],
-          "protocolProfileBehavior": {
-            "disableCookies": true
-          }
-        },
-        {
-          "name": "5. Category by slug",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": "{{baseUrl}}/api/categories/slug/{{categorySlug}}"
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));"
-                ]
-              }
-            }
-          ],
-          "protocolProfileBehavior": {
-            "disableCookies": true
-          }
-        },
-        {
-          "name": "6. Category by ID",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": "{{baseUrl}}/api/categories/{{categoryId}}"
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));"
-                ]
-              }
-            }
-          ],
-          "protocolProfileBehavior": {
-            "disableCookies": true
-          }
-        }
+        { "name": "Health", "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/api/health" } },
+        { "name": "Ready", "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/api/ready" } }
       ]
     },
     {
-      "name": "B. Buyer - denied admin access",
+      "name": "Auth",
       "item": [
         {
-          "name": "1. Request buyer OTP",
+          "name": "Request OTP",
           "request": {
             "method": "POST",
             "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              },
-              {
-                "key": "X-CSRF-Protection",
-                "value": "1"
-              },
-              {
-                "key": "Origin",
-                "value": "{{frontendOrigin}}"
-              }
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-CSRF-Protection", "value": "1" },
+              { "key": "Origin", "value": "{{frontendOrigin}}" }
             ],
             "url": "{{baseUrl}}/api/auth/otp/request",
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"phone\": \"{{buyerPhone}}\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
+            "body": { "mode": "raw", "raw": "{\n  \"phone\": \"{{buyerPhone}}\",\n  \"channel\": \"PHONE\",\n  \"purpose\": \"LOGIN\"\n}", "options": { "raw": { "language": "json" } } }
           },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
-                  "pm.collectionVariables.set('challengeId', pm.response.json().data.challengeId);"
-                ]
-              }
-            }
-          ]
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));", "pm.collectionVariables.set('challengeId', pm.response.json().data.challengeId);"] } }]
         },
         {
-          "name": "2. Verify buyer OTP",
+          "name": "Verify OTP",
           "request": {
             "method": "POST",
             "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              },
-              {
-                "key": "X-CSRF-Protection",
-                "value": "1"
-              },
-              {
-                "key": "Origin",
-                "value": "{{frontendOrigin}}"
-              }
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-CSRF-Protection", "value": "1" },
+              { "key": "Origin", "value": "{{frontendOrigin}}" }
             ],
             "url": "{{baseUrl}}/api/auth/otp/verify",
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"challengeId\": \"{{challengeId}}\",\n  \"otp\": \"{{otp}}\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));"
-                ]
-              }
-            }
-          ]
+            "body": { "mode": "raw", "raw": "{\n  \"challengeId\": \"{{challengeId}}\",\n  \"otp\": \"{{otp}}\"\n}", "options": { "raw": { "language": "json" } } }
+          }
         },
+        { "name": "Me", "request": { "method": "GET", "header": [{ "key": "Origin", "value": "{{frontendOrigin}}" }], "url": "{{baseUrl}}/api/auth/me" } },
         {
-          "name": "3. Buyer admin list denied",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": "{{baseUrl}}/api/admin/categories"
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test(\"HTTP 403\", () => pm.response.to.have.status(403));"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "4. Buyer admin detail denied",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": "{{baseUrl}}/api/admin/categories/{{categoryId}}"
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test(\"HTTP 403\", () => pm.response.to.have.status(403));"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "5. Buyer category creation denied",
+          "name": "Logout",
           "request": {
             "method": "POST",
             "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              },
-              {
-                "key": "X-CSRF-Protection",
-                "value": "1"
-              },
-              {
-                "key": "Origin",
-                "value": "{{frontendOrigin}}"
-              }
+              { "key": "X-CSRF-Protection", "value": "1" },
+              { "key": "Origin", "value": "{{frontendOrigin}}" }
             ],
-            "url": "{{baseUrl}}/api/admin/categories",
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"name\": \"Denied\",\n  \"slug\": \"denied-example\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test(\"HTTP 403\", () => pm.response.to.have.status(403));"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "6. Buyer category update denied",
-          "request": {
-            "method": "PATCH",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              },
-              {
-                "key": "X-CSRF-Protection",
-                "value": "1"
-              },
-              {
-                "key": "Origin",
-                "value": "{{frontendOrigin}}"
-              }
-            ],
-            "url": "{{baseUrl}}/api/admin/categories/{{categoryId}}",
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"name\": \"Denied\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test(\"HTTP 403\", () => pm.response.to.have.status(403));"
-                ]
-              }
-            }
-          ]
+            "url": "{{baseUrl}}/api/auth/logout"
+          }
         }
       ]
     },
     {
-      "name": "C. Admin - pending real staff authentication",
-      "event": [
-        {
-          "listen": "prerequest",
-          "script": {
-            "type": "text/javascript",
-            "exec": [
-              "if (pm.collectionVariables.get('enableAdminRequests') !== 'true') { pm.execution.skipRequest(); }"
-            ]
-          }
-        }
-      ],
+      "name": "Buyer Profile",
       "item": [
-        {
-          "name": "1. Admin list",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": "{{baseUrl}}/api/admin/categories"
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "2. Admin detail",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": "{{baseUrl}}/api/admin/categories/{{categoryId}}"
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "3. Create category",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              },
-              {
-                "key": "X-CSRF-Protection",
-                "value": "1"
-              },
-              {
-                "key": "Origin",
-                "value": "{{frontendOrigin}}"
-              }
-            ],
-            "url": "{{baseUrl}}/api/admin/categories",
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"name\": \"Postman example\",\n  \"slug\": \"postman-{{$guid}}\",\n  \"parentId\": null,\n  \"sortOrder\": 10,\n  \"isActive\": true\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test(\"HTTP 201\", () => pm.response.to.have.status(201));",
-                  "pm.collectionVariables.set('adminCategoryId', pm.response.json().data.category.id);"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "4. Update category",
-          "request": {
-            "method": "PATCH",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              },
-              {
-                "key": "X-CSRF-Protection",
-                "value": "1"
-              },
-              {
-                "key": "Origin",
-                "value": "{{frontendOrigin}}"
-              }
-            ],
-            "url": "{{baseUrl}}/api/admin/categories/{{adminCategoryId}}",
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"description\": \"Updated in Postman\",\n  \"sortOrder\": 20,\n  \"isActive\": false\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));"
-                ]
-              }
-            }
-          ]
-        }
+        { "name": "Get Profile", "request": { "method": "GET", "header": [{ "key": "Origin", "value": "{{frontendOrigin}}" }], "url": "{{baseUrl}}/api/users/me" } },
+        { "name": "List Addresses", "request": { "method": "GET", "header": [{ "key": "Origin", "value": "{{frontendOrigin}}" }], "url": "{{baseUrl}}/api/users/me/addresses" } }
       ]
     },
     {
-      "name": "D. Day 6 - Category attributes",
+      "name": "Public Categories",
       "item": [
-        {
-          "name": "1. Public category attributes",
-          "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/api/categories/{{categoryId}}/attributes" },
-          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));"] } }]
-        },
-        {
-          "name": "2. Admin list attributes",
-          "request": { "method": "GET", "header": [{ "key": "Origin", "value": "{{frontendOrigin}}" }], "url": "{{baseUrl}}/api/admin/attributes?page=1&limit=20" }
-        },
-        {
-          "name": "3. Admin create attribute",
-          "request": {
-            "method": "POST",
-            "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "X-CSRF-Protection", "value": "1" },
-              { "key": "Origin", "value": "{{frontendOrigin}}" }
-            ],
-            "url": "{{baseUrl}}/api/admin/attributes",
-            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Postman Attribute\",\n  \"code\": \"postman_{{$guid}}\",\n  \"type\": \"SELECT\"\n}", "options": { "raw": { "language": "json" } } }
-          },
-          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["if (pm.response.code === 201) pm.collectionVariables.set('attributeId', pm.response.json().data.attribute.id);"] } }]
-        },
-        {
-          "name": "4. Admin create attribute value",
-          "request": {
-            "method": "POST",
-            "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "X-CSRF-Protection", "value": "1" },
-              { "key": "Origin", "value": "{{frontendOrigin}}" }
-            ],
-            "url": "{{baseUrl}}/api/admin/attributes/{{attributeId}}/values",
-            "body": { "mode": "raw", "raw": "{\n  \"value\": \"cotton\",\n  \"label\": \"Cotton\",\n  \"sortOrder\": 1\n}", "options": { "raw": { "language": "json" } } }
-          },
-          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["if (pm.response.code === 201) pm.collectionVariables.set('valueId', pm.response.json().data.value.id);"] } }]
-        },
-        {
-          "name": "5. Admin update attribute value",
-          "request": {
-            "method": "PATCH",
-            "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "X-CSRF-Protection", "value": "1" },
-              { "key": "Origin", "value": "{{frontendOrigin}}" }
-            ],
-            "url": "{{baseUrl}}/api/admin/attributes/{{attributeId}}/values/{{valueId}}",
-            "body": { "mode": "raw", "raw": "{\n  \"label\": \"Pure Cotton\",\n  \"sortOrder\": 2,\n  \"isActive\": true\n}", "options": { "raw": { "language": "json" } } }
-          }
-        },
-        {
-          "name": "6. Admin map attribute to category",
-          "request": {
-            "method": "POST",
-            "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "X-CSRF-Protection", "value": "1" },
-              { "key": "Origin", "value": "{{frontendOrigin}}" }
-            ],
-            "url": "{{baseUrl}}/api/admin/categories/{{categoryId}}/attributes",
-            "body": { "mode": "raw", "raw": "{\n  \"attributeId\": \"{{attributeId}}\",\n  \"isRequired\": true,\n  \"isFilterable\": true,\n  \"isVariantOption\": false,\n  \"sortOrder\": 3\n}", "options": { "raw": { "language": "json" } } }
-          }
-        },
-        {
-          "name": "7. Admin list category attributes",
-          "request": { "method": "GET", "header": [{ "key": "Origin", "value": "{{frontendOrigin}}" }], "url": "{{baseUrl}}/api/admin/categories/{{categoryId}}/attributes" }
-        },
-        {
-          "name": "8. Admin update category mapping",
-          "request": {
-            "method": "PATCH",
-            "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "X-CSRF-Protection", "value": "1" },
-              { "key": "Origin", "value": "{{frontendOrigin}}" }
-            ],
-            "url": "{{baseUrl}}/api/admin/categories/{{categoryId}}/attributes/{{attributeId}}",
-            "body": { "mode": "raw", "raw": "{\n  \"isRequired\": false,\n  \"sortOrder\": 5\n}", "options": { "raw": { "language": "json" } } }
-          }
-        },
-        {
-          "name": "9. Admin unmap category attribute",
-          "request": {
-            "method": "DELETE",
-            "header": [
-              { "key": "X-CSRF-Protection", "value": "1" },
-              { "key": "Origin", "value": "{{frontendOrigin}}" }
-            ],
-            "url": "{{baseUrl}}/api/admin/categories/{{categoryId}}/attributes/{{attributeId}}"
-          }
-        }
-      ],
-      "description": "Real ADMIN manual verification is pending until legitimate staff ADMIN authentication exists. Buyer sessions should receive 403 for these admin requests."
+        { "name": "List Categories", "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/api/categories?page=1&limit=20" } },
+        { "name": "Root Categories", "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/api/categories?rootOnly=true" } },
+        { "name": "Category Tree", "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/api/categories/tree" } },
+        { "name": "Category By ID", "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/api/categories/{{categoryId}}" } },
+        { "name": "Category By Slug", "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/api/categories/slug/{{categorySlug}}" } },
+        { "name": "Category Attributes", "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/api/categories/{{categoryId}}/attributes" } }
+      ]
     }
   ]
 }
