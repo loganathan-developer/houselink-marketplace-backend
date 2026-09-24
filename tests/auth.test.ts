@@ -8,6 +8,7 @@ import { testDatabaseUrl } from "./test-database.js";
 import { registerCategoryTests } from "./categories.scenarios.js";
 import { registerAttributeTests } from "./attributes.scenarios.js";
 import { registerBrandTests } from "./brands.scenarios.js";
+import { registerAdminAuthTests } from "./admin-auth.scenarios.js";
 import { spawn } from "node:child_process";
 import { setTimeout as delay } from "node:timers/promises";
 import pg from "pg";
@@ -36,6 +37,7 @@ const url = testDatabaseUrl(process.env.TEST_DATABASE_URL, process.env.DATABASE_
 url.searchParams.set("schema", schema);
 process.env.DATABASE_URL = url.toString();
 process.env.NODE_ENV = "test";
+process.env.ADMIN_MFA_ENCRYPTION_KEY = randomBytes(32).toString("hex");
 process.env.OTP_PROVIDER = "mock";
 process.env.ENABLE_MOCK_OTP_RETRIEVAL = "true";
 process.env.ALLOW_ANY_DEV_OTP = "false";
@@ -947,6 +949,18 @@ registerBrandTests({
   }),
   send: (path, cookie = "", body, method = body === undefined ? "GET" : "POST") => fetch(`${base}/api${path}`, {
     method, headers: { ...csrf, Cookie: cookie, "Content-Type": "application/json" },
+    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+  }),
+});
+
+registerAdminAuthTests({
+  prisma, buyerLogin: login,
+  send: (path, cookie = "", body, method = body === undefined ? "GET" : "POST") => fetch(`${base}/api${path}`, {
+    method, headers: { ...csrf, Cookie: cookie, "Content-Type": "application/json" },
+    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+  }),
+  sendWithoutCsrf: (path, cookie = "", body, method = "POST") => fetch(`${base}/api${path}`, {
+    method, headers: { Origin: env.FRONTEND_ORIGIN, Cookie: cookie, "Content-Type": "application/json" },
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   }),
 });

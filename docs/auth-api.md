@@ -228,6 +228,8 @@ tokens are revoked by logout and cannot resurrect the session. In-flight request
 already passed authentication may complete; future resource mutations must enforce
 ownership/status transactionally where required.
 
-Google, private admin password/MFA login and identity linking are planned, not implemented.
+Google and identity linking are planned, not implemented. Private admin password/MFA
+login is implemented; see [Admin Authentication API](admin-auth-api.md). Customer
+refresh accepts only CUSTOMER tokens; staff refresh has a separate cookie and route.
 Role definitions alone grant nobody privileges. Keep blocked/deleted identity records
 as tombstones so OTP login cannot silently recreate a disabled account.

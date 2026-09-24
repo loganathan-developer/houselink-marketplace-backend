@@ -11,7 +11,8 @@ current implemented scope is authentication, user session handling, role seeding
 database connectivity and health/readiness checks.
 
 Marketplace features such as products, orders, seller approval workflows, admin
-screens and Google/staff login are planned but not yet implemented.
+screens and Google login are planned but not yet implemented. Staff password + MFA
+login is implemented; see [Admin Authentication API](admin-auth-api.md).
 
 ## 2. Local development workflow
 
@@ -51,7 +52,9 @@ GET /api/ready
 
 ## 4. Authentication workflow
 
-The implemented login method is OTP-based phone or email authentication.
+Customer login uses phone/email OTP. Admin login uses a provisioned password,
+then TOTP enrollment/verification or a recovery code, creating a separate STAFF
+session only after MFA. The sequence below describes customer login.
 
 1. Client requests an OTP using `/api/auth/otp/request`.
 2. Backend validates the phone/email and creates an OTP challenge.

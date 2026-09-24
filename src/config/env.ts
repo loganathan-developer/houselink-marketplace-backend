@@ -44,6 +44,8 @@ const envSchema = z.object({
 
   COOKIE_SAME_SITE: z.enum(["lax", "strict", "none"]).default("lax"),
   COOKIE_SECURE: z.enum(["true", "false"]).optional(),
+  ADMIN_MFA_ENCRYPTION_KEY: z.string().regex(/^[a-fA-F0-9]{64}$/, "Use 32 random bytes encoded as hex").optional(),
+  ADMIN_MFA_ISSUER: z.string().trim().min(1).max(100).default("HouseLink Admin"),
 
   OTP_HASH_SECRET: z
     .string()

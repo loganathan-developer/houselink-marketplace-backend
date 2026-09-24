@@ -5,10 +5,10 @@ import { prisma } from "../../../config/database.js";
 import { env } from "../../../config/env.js";
 import { HttpError } from "../../../shared/errors/http-error.js";
 
-function sharedRateLimiter(scope: string, windowSeconds: number, limit: number): RequestHandler {
+export function sharedRateLimiter(scope: string, windowSeconds: number, limit: number, identity?: (req: Parameters<RequestHandler>[0]) => string): RequestHandler {
   return async (req, res, next) => {
     const ip = ipKeyGenerator(req.ip ?? req.socket.remoteAddress ?? "unknown");
-    const key = createHash("sha256").update(`${scope}:${ip}`).digest("hex");
+    const key = createHash("sha256").update(`${scope}:${identity ? identity(req) : ip}`).digest("hex");
     // Atomic upserts share counters across API instances, including IPv6 subnet grouping.
     const rows = await prisma.$queryRaw<Array<{ hits: number; expiresAt: Date }>>`
       INSERT INTO "RateLimitBucket" ("key", "hits", "expiresAt")

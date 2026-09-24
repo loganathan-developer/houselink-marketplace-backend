@@ -1,0 +1,23 @@
+import { Router } from "express";
+import { authenticate, requireRole } from "../../middleware/auth.middleware.js";
+import { validateRequest } from "../../middleware/validate.middleware.js";
+import { sharedRateLimiter } from "../auth/otp/otp-rate-limit.middleware.js";
+import { challengeSchema, emptySchema, loginSchema, recoverySchema, totpSchema } from "./admin-auth.schema.js";
+import * as controller from "./admin-auth.controller.js";
+
+const router = Router();
+router.use((_req, res, next) => { res.setHeader("Cache-Control", "no-store"); next(); });
+router.use(sharedRateLimiter("admin-auth", 60, 120));
+const loginIp = sharedRateLimiter("admin-login-ip", 900, 30);
+const loginAccount = sharedRateLimiter("admin-login-account", 900, 10, (req) => loginSchema.parse(req.body).email);
+const mfaIp = sharedRateLimiter("admin-mfa-ip", 300, 30);
+router.post("/login", loginIp, validateRequest({ body: loginSchema }), loginAccount, controller.login);
+router.post("/mfa/setup", mfaIp, validateRequest({ body: challengeSchema }), controller.setup);
+router.post("/mfa/confirm", mfaIp, validateRequest({ body: totpSchema }), controller.finish("confirm"));
+router.post("/mfa/verify", mfaIp, validateRequest({ body: totpSchema }), controller.finish("verify"));
+router.post("/mfa/recovery", mfaIp, validateRequest({ body: recoverySchema }), controller.finish("recovery"));
+router.post("/refresh", validateRequest({ body: emptySchema }), controller.refresh);
+router.get("/me", authenticate, requireRole("ADMIN"), controller.me);
+router.post("/logout", authenticate, requireRole("ADMIN"), validateRequest({ body: emptySchema }), controller.logout(false));
+router.post("/logout-all", authenticate, requireRole("ADMIN"), validateRequest({ body: emptySchema }), controller.logout(true));
+export default router;

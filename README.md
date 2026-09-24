@@ -92,7 +92,9 @@ For simplified local development, set `NODE_ENV=development`, `OTP_PROVIDER=mock
 for an existing challenge. For local mock retrieval explicitly set
 `ENABLE_MOCK_OTP_RETRIEVAL=true`; the endpoint also requires `OTP_PROVIDER=mock` and a
 loopback client. Mock delivery is local testing only and does not send SMS or email.
-Google and staff login remain planned.
+Google login remains planned. Staff password + authenticator MFA login is implemented;
+see [Admin Authentication API](docs/admin-auth-api.md) for development provisioning,
+first enrollment, recovery, separate admin cookies and Postman instructions.
 
 **Production is blocked until a real SMS/email provider is implemented and configured.**
 `OTP_PROVIDER=sms` currently fails startup; there is no silent mock fallback.
