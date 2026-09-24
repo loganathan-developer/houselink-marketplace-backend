@@ -50,6 +50,12 @@ enum AttributeType {
   BOOLEAN
 }
 
+enum BrandStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 model User {
   id                 String              @id @default(uuid()) @db.Uuid
   name               String?
@@ -150,6 +156,24 @@ model CategoryAttribute {
   @@index([attributeId])
   @@index([categoryId, sortOrder])
   @@index([isActive])
+}
+
+model Brand {
+  id              String      @id @default(uuid()) @db.Uuid
+  name            String      @db.VarChar(120)
+  normalizedName  String      @unique @db.VarChar(120)
+  slug            String      @unique @db.VarChar(160)
+  description     String?     @db.VarChar(2000)
+  logoUrl         String?     @db.VarChar(2048)
+  status          BrandStatus @default(PENDING)
+  isActive        Boolean     @default(true)
+  rejectionReason String?     @db.VarChar(1000)
+  approvedAt      DateTime?   @db.Timestamptz(3)
+  rejectedAt      DateTime?   @db.Timestamptz(3)
+  createdAt       DateTime    @default(now()) @db.Timestamptz(3)
+  updatedAt       DateTime    @updatedAt @db.Timestamptz(3)
+
+  @@index([status, isActive, name, id])
 }
 
 model Role {

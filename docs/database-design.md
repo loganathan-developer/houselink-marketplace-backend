@@ -36,6 +36,12 @@ Authentication design for the marketplace (planned features are labeled below):
 - Foreign keys enforce relationships.
 - Raw passwords, OTPs and refresh tokens are never stored.
 
+## Brand master
+
+Brand stores official platform brand records independent of categories, products and seller permissions. Name uniqueness is enforced through a server-generated normalizedName value: Unicode NFKC, trimmed, collapsed whitespace and lowercased. Slugs are globally unique across all statuses, including inactive records.
+
+Brand statuses are PENDING, APPROVED and REJECTED. Cross-field review invariants are protected by a database check constraint and service logic: PENDING has no review metadata, APPROVED has approvedAt only, and REJECTED has rejectedAt plus a nonblank rejectionReason. Public reads filter to APPROVED and active brands and expose no review metadata.
+
 ## 1. User
 
 Purpose: Store the account.

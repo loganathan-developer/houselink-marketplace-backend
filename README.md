@@ -73,6 +73,14 @@ Visibility requires active ancestors. Nesting is limited to 64 levels.
 After migrations and client generation, `npm run seed:categories` optionally adds
 repeatable development-only samples and the T-Shirt attribute configuration.
 
+## Brands
+
+See [Brand API](docs/brands-api.md) for public brand browsing and protected admin brand
+management. Apply migration `20260924054255_add_brand_management`, regenerate Prisma,
+then run `npm run seed:brands` to idempotently add approved development brands: Nike,
+Puma, Adidas, Roadster and H&M. The seed preserves existing records and reports
+conflicting name/slug identities instead of overwriting them.
+
 ## Authentication and deployment
 
 See [API contracts and security policy](docs/auth-api.md) and

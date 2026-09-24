@@ -13,7 +13,8 @@
     "start": "node --enable-source-maps dist/server.js",
     "typecheck": "tsc --noEmit",
     "seed:roles": "tsx prisma/seed.ts",
-    "seed:categories": "tsx prisma/seed-categories.ts"
+    "seed:categories": "tsx prisma/seed-categories.ts",
+    "seed:brands": "tsx prisma/seed-brands.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

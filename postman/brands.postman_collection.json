@@ -1,0 +1,61 @@
+{
+  "info": {
+    "name": "HouseLink Brands",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:5000" },
+    { "key": "brandId", "value": "" },
+    { "key": "brandSlug", "value": "nike" }
+  ],
+  "item": [
+    {
+      "name": "Public list brands",
+      "request": { "method": "GET", "url": "{{baseUrl}}/api/brands?page=1&limit=20" }
+    },
+    {
+      "name": "Public brand by slug",
+      "request": { "method": "GET", "url": "{{baseUrl}}/api/brands/slug/{{brandSlug}}" }
+    },
+    {
+      "name": "Admin list brands",
+      "request": { "method": "GET", "url": "{{baseUrl}}/api/admin/brands?status=PENDING" }
+    },
+    {
+      "name": "Admin create brand",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "X-CSRF-Protection", "value": "1" }
+        ],
+        "url": "{{baseUrl}}/api/admin/brands",
+        "body": { "mode": "raw", "raw": "{\n  \"name\": \"Nike\",\n  \"slug\": \"nike\"\n}" }
+      }
+    },
+    {
+      "name": "Admin approve brand",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "X-CSRF-Protection", "value": "1" }
+        ],
+        "url": "{{baseUrl}}/api/admin/brands/{{brandId}}/approve",
+        "body": { "mode": "raw", "raw": "{}" }
+      }
+    },
+    {
+      "name": "Admin reject brand",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "X-CSRF-Protection", "value": "1" }
+        ],
+        "url": "{{baseUrl}}/api/admin/brands/{{brandId}}/reject",
+        "body": { "mode": "raw", "raw": "{\n  \"reason\": \"Brand information could not be verified.\"\n}" }
+      }
+    }
+  ]
+}
