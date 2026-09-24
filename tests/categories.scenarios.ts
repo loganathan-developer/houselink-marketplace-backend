@@ -20,6 +20,14 @@ export function registerCategoryTests(deps: {
     await prisma.category.deleteMany();
     await run();
   });
+  const accountFixture = async (roleCode: "ADMIN" | "SELLER") => {
+    const role = await prisma.role.findUniqueOrThrow({ where: { code: roleCode } });
+    const user = await prisma.user.create({ data: { roles: { create: { roleId: role.id } } } });
+    const now = new Date(), expiresAt = new Date(now.getTime() + 600000);
+    const session = await prisma.authSession.create({ data: { userId: user.id, context: "STAFF", mfaVerifiedAt: now, lastSeenAt: now, idleExpiresAt: expiresAt, absoluteExpiresAt: expiresAt } });
+    const { signAccessToken } = await import("../src/modules/auth/token.service.js");
+    return { userId: user.id, sessionId: session.id, cookie: `access_token=${await signAccessToken(user.id, session.id, expiresAt)}` };
+  };
 
   scenario("public reads need no login or CSRF token", async () => {
     const root = await prisma.category.create({ data: { name: "Public root", slug: "public-root" } });
@@ -87,7 +95,7 @@ export function registerCategoryTests(deps: {
     await seedCategorySamples();
     await seedCategorySamples();
     assert.equal(await prisma.category.count(), 17);
-    assert.equal(await prisma.attribute.count({ where: { code: { in: ["size", "color", "fabric", "fit", "pattern", "sleeve_length"] } } }), 6);
+    assert.equal(await prisma.attribute.count({ where: { code: { in: ["brand", "size", "color", "fabric", "fit", "pattern", "sleeve_length"] } } }), 7);
     assert.deepEqual(await authState(), before);
   });
 
@@ -103,5 +111,26 @@ export function registerCategoryTests(deps: {
     const after = await prisma.category.findUniqueOrThrow({ where: { id: created.id } });
     assert.equal(after.createdAt.getTime(), before.createdAt.getTime());
     assert(after.updatedAt > before.updatedAt);
+  });
+
+  scenario("admin category APIs enforce authorization and support create/update/deactivate/move", async () => {
+    const buyer = await deps.login();
+    const seller = await accountFixture("SELLER");
+    const admin = await accountFixture("ADMIN");
+    assert.equal((await send("/admin/categories")).status, 401);
+    assert.equal((await send("/admin/categories", buyer.cookie)).status, 403);
+    assert.equal((await send("/admin/categories", seller.cookie)).status, 403);
+    const rootResponse = await send("/admin/categories", admin.cookie, { name: "Root", slug: "admin-root", sortOrder: 2 });
+    assert.equal(rootResponse.status, 201, await rootResponse.clone().text());
+    const root = (await rootResponse.json()).data.category as { id: string };
+    const childResponse = await send("/admin/categories", admin.cookie, { name: "Child", slug: "admin-child", parentId: root.id });
+    assert.equal(childResponse.status, 201, await childResponse.clone().text());
+    const child = (await childResponse.json()).data.category as { id: string };
+    assert.equal((await send("/admin/categories", admin.cookie, { name: "Dup", slug: "admin-root" })).status, 409);
+    assert.equal((await send(`/admin/categories/${root.id}`, admin.cookie, { parentId: child.id }, "PATCH")).status, 400);
+    assert.equal((await send(`/admin/categories/${child.id}`, admin.cookie, { isActive: false, sortOrder: 4 }, "PATCH")).status, 200);
+    assert.equal((await send(`/categories/${child.id}`)).status, 404);
+    assert.equal((await send(`/admin/categories/${child.id}`, admin.cookie)).status, 200);
+    assert.equal((await send("/admin/categories?isActive=false", admin.cookie)).status, 200);
   });
 }

@@ -2,9 +2,9 @@
 
 Base URL for local development: `http://localhost:5000`.
 
-The current buyer-side runtime exposes public category browsing only. Admin category
-management routes are intentionally not mounted until a legitimate staff/admin login
-and portal are implemented.
+The runtime exposes public category browsing and protected ADMIN category management.
+Real staff/admin login is still pending, so manual ADMIN Postman testing requires a
+future staff auth flow or a controlled automated test fixture.
 
 ## Endpoints
 
@@ -14,6 +14,10 @@ GET /api/categories/tree
 GET /api/categories/slug/:slug
 GET /api/categories/:categoryId
 GET /api/categories/:categoryId/attributes
+GET /api/admin/categories
+GET /api/admin/categories/:categoryId
+POST /api/admin/categories
+PATCH /api/admin/categories/:categoryId
 ```
 
 All responses use the standard `{ "success": true, "data": ... }` envelope. Errors use

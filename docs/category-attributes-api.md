@@ -1,12 +1,9 @@
 # Public Category Attributes API
 
 Day 6 adds reusable category attributes for future seller product creation, variants,
-buyer filters and search. The current buyer-side runtime exposes only the public read
-API. Admin attribute management routes are intentionally not mounted until staff/admin
-login and the corresponding portal exist.
-
-Brand is intentionally **not** an Attribute. Brand management will be implemented as a
-separate module.
+buyer filters and search. Public users can read active category attributes. Protected
+admin routes manage attribute configuration using ADMIN authorization; real staff login
+is still pending, so manual ADMIN Postman testing requires a future staff auth flow.
 
 ## Data model
 
@@ -72,11 +69,30 @@ Example response:
 Invalid UUID parameters return `400 VALIDATION_ERROR`. Missing or inactive categories
 return `404 CATEGORY_NOT_FOUND`.
 
+## Admin API
+
+All admin endpoints require authenticated active ADMIN authorization and CSRF headers:
+
+```http
+GET /api/admin/attributes
+POST /api/admin/attributes
+PATCH /api/admin/attributes/:attributeId
+POST /api/admin/attributes/:attributeId/values
+PATCH /api/admin/attributes/:attributeId/values/:valueId
+GET /api/admin/categories/:categoryId/attributes
+POST /api/admin/categories/:categoryId/attributes
+PATCH /api/admin/categories/:categoryId/attributes/:attributeId
+DELETE /api/admin/categories/:categoryId/attributes/:attributeId
+```
+
+Guest admin requests return `401`. BUYER/SELLER admin requests return `403`.
+
 ## Seeded T-Shirt configuration
 
 `npm run seed:categories` seeds `Men > Topwear > T-Shirts` with:
 
 - Size: S, M, L, XL
+- Brand: HouseLink, Urban Stitch, Dailywear
 - Color: Black, White, Blue, Red
 - Fabric: Cotton, Polyester, Linen
 - Fit: Slim, Regular, Oversized

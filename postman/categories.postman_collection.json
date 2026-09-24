@@ -1,8 +1,8 @@
 {
   "info": {
-    "name": "HouseLink Buyer/Public API",
+    "name": "HouseLink Day 1-6 API",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
-    "description": "Buyer/public runtime checks only. Admin API routes are intentionally not mounted in the current buyer-side scope."
+    "description": "Day 1-6 API checks. Public/buyer routes can be tested now. Admin routes are mounted and protected, but real ADMIN login Postman testing is pending staff authentication."
   },
   "auth": {
     "type": "noauth"
@@ -14,7 +14,9 @@
     { "key": "categorySlug", "value": "men-topwear-tshirts", "type": "string" },
     { "key": "buyerPhone", "value": "+918765445278", "type": "string" },
     { "key": "challengeId", "value": "", "type": "string" },
-    { "key": "otp", "value": "123456", "type": "string" }
+    { "key": "otp", "value": "123456", "type": "string" },
+    { "key": "attributeId", "value": "", "type": "string" },
+    { "key": "attributeValueId", "value": "", "type": "string" }
   ],
   "item": [
     {
@@ -84,6 +86,28 @@
         { "name": "Category By ID", "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/api/categories/{{categoryId}}" } },
         { "name": "Category By Slug", "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/api/categories/slug/{{categorySlug}}" } },
         { "name": "Category Attributes", "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/api/categories/{{categoryId}}/attributes" } }
+      ]
+    },
+    {
+      "name": "Admin Categories - Requires ADMIN Staff Login",
+      "item": [
+        { "name": "List Admin Categories", "request": { "method": "GET", "header": [{ "key": "Origin", "value": "{{frontendOrigin}}" }], "url": "{{baseUrl}}/api/admin/categories?page=1&limit=20" } },
+        { "name": "Get Admin Category", "request": { "method": "GET", "header": [{ "key": "Origin", "value": "{{frontendOrigin}}" }], "url": "{{baseUrl}}/api/admin/categories/{{categoryId}}" } },
+        { "name": "Create Category", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }, { "key": "X-CSRF-Protection", "value": "1" }, { "key": "Origin", "value": "{{frontendOrigin}}" }], "url": "{{baseUrl}}/api/admin/categories", "body": { "mode": "raw", "raw": "{\n  \"name\": \"Accessories\",\n  \"slug\": \"accessories\",\n  \"sortOrder\": 10,\n  \"isActive\": true\n}", "options": { "raw": { "language": "json" } } } } },
+        { "name": "Update Category", "request": { "method": "PATCH", "header": [{ "key": "Content-Type", "value": "application/json" }, { "key": "X-CSRF-Protection", "value": "1" }, { "key": "Origin", "value": "{{frontendOrigin}}" }], "url": "{{baseUrl}}/api/admin/categories/{{categoryId}}", "body": { "mode": "raw", "raw": "{\n  \"sortOrder\": 20,\n  \"isActive\": true\n}", "options": { "raw": { "language": "json" } } } } }
+      ]
+    },
+    {
+      "name": "Admin Attributes - Requires ADMIN Staff Login",
+      "item": [
+        { "name": "List Attributes", "request": { "method": "GET", "header": [{ "key": "Origin", "value": "{{frontendOrigin}}" }], "url": "{{baseUrl}}/api/admin/attributes?page=1&limit=20" } },
+        { "name": "Create Attribute", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }, { "key": "X-CSRF-Protection", "value": "1" }, { "key": "Origin", "value": "{{frontendOrigin}}" }], "url": "{{baseUrl}}/api/admin/attributes", "body": { "mode": "raw", "raw": "{\n  \"name\": \"Material\",\n  \"code\": \"material\",\n  \"type\": \"SELECT\",\n  \"isActive\": true\n}", "options": { "raw": { "language": "json" } } } } },
+        { "name": "Update Attribute", "request": { "method": "PATCH", "header": [{ "key": "Content-Type", "value": "application/json" }, { "key": "X-CSRF-Protection", "value": "1" }, { "key": "Origin", "value": "{{frontendOrigin}}" }], "url": "{{baseUrl}}/api/admin/attributes/{{attributeId}}", "body": { "mode": "raw", "raw": "{\n  \"isActive\": true\n}", "options": { "raw": { "language": "json" } } } } },
+        { "name": "Create Attribute Value", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }, { "key": "X-CSRF-Protection", "value": "1" }, { "key": "Origin", "value": "{{frontendOrigin}}" }], "url": "{{baseUrl}}/api/admin/attributes/{{attributeId}}/values", "body": { "mode": "raw", "raw": "{\n  \"value\": \"cotton\",\n  \"label\": \"Cotton\",\n  \"sortOrder\": 1\n}", "options": { "raw": { "language": "json" } } } } },
+        { "name": "Update Attribute Value", "request": { "method": "PATCH", "header": [{ "key": "Content-Type", "value": "application/json" }, { "key": "X-CSRF-Protection", "value": "1" }, { "key": "Origin", "value": "{{frontendOrigin}}" }], "url": "{{baseUrl}}/api/admin/attributes/{{attributeId}}/values/{{attributeValueId}}", "body": { "mode": "raw", "raw": "{\n  \"sortOrder\": 2\n}", "options": { "raw": { "language": "json" } } } } },
+        { "name": "List Category Attribute Mappings", "request": { "method": "GET", "header": [{ "key": "Origin", "value": "{{frontendOrigin}}" }], "url": "{{baseUrl}}/api/admin/categories/{{categoryId}}/attributes" } },
+        { "name": "Create Category Attribute Mapping", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }, { "key": "X-CSRF-Protection", "value": "1" }, { "key": "Origin", "value": "{{frontendOrigin}}" }], "url": "{{baseUrl}}/api/admin/categories/{{categoryId}}/attributes", "body": { "mode": "raw", "raw": "{\n  \"attributeId\": \"{{attributeId}}\",\n  \"isRequired\": false,\n  \"isFilterable\": true,\n  \"isVariantOption\": false,\n  \"sortOrder\": 1\n}", "options": { "raw": { "language": "json" } } } } },
+        { "name": "Deactivate Category Attribute Mapping", "request": { "method": "DELETE", "header": [{ "key": "X-CSRF-Protection", "value": "1" }, { "key": "Origin", "value": "{{frontendOrigin}}" }], "url": "{{baseUrl}}/api/admin/categories/{{categoryId}}/attributes/{{attributeId}}" } }
       ]
     }
   ]

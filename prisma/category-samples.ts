@@ -14,12 +14,13 @@ const samples: [string, string, number | null][] = [
 ];
 
 const tshirtAttributes = [
-  { name: "Size", code: "size", sortOrder: 1, isRequired: true, isVariantOption: true, values: [["s", "S"], ["m", "M"], ["l", "L"], ["xl", "XL"]] },
-  { name: "Color", code: "color", sortOrder: 2, isRequired: true, isVariantOption: true, values: [["black", "Black"], ["white", "White"], ["blue", "Blue"], ["red", "Red"]] },
-  { name: "Fabric", code: "fabric", sortOrder: 3, isRequired: true, isVariantOption: false, values: [["cotton", "Cotton"], ["polyester", "Polyester"], ["linen", "Linen"]] },
-  { name: "Fit", code: "fit", sortOrder: 4, isRequired: true, isVariantOption: false, values: [["slim", "Slim"], ["regular", "Regular"], ["oversized", "Oversized"]] },
-  { name: "Pattern", code: "pattern", sortOrder: 5, isRequired: false, isVariantOption: false, values: [["solid", "Solid"], ["printed", "Printed"], ["striped", "Striped"], ["checked", "Checked"]] },
-  { name: "Sleeve Length", code: "sleeve_length", sortOrder: 6, isRequired: false, isVariantOption: false, values: [["half_sleeve", "Half Sleeve"], ["full_sleeve", "Full Sleeve"], ["sleeveless", "Sleeveless"]] },
+  { name: "Brand", code: "brand", sortOrder: 1, isRequired: true, isVariantOption: false, values: [["houselink", "HouseLink"], ["urban_stitch", "Urban Stitch"], ["dailywear", "Dailywear"]] },
+  { name: "Size", code: "size", sortOrder: 2, isRequired: true, isVariantOption: true, values: [["s", "S"], ["m", "M"], ["l", "L"], ["xl", "XL"]] },
+  { name: "Color", code: "color", sortOrder: 3, isRequired: true, isVariantOption: true, values: [["black", "Black"], ["white", "White"], ["blue", "Blue"], ["red", "Red"]] },
+  { name: "Fabric", code: "fabric", sortOrder: 4, isRequired: false, isVariantOption: false, values: [["cotton", "Cotton"], ["polyester", "Polyester"], ["linen", "Linen"]] },
+  { name: "Fit", code: "fit", sortOrder: 5, isRequired: false, isVariantOption: false, values: [["slim", "Slim"], ["regular", "Regular"], ["oversized", "Oversized"]] },
+  { name: "Pattern", code: "pattern", sortOrder: 6, isRequired: false, isVariantOption: false, values: [["solid", "Solid"], ["printed", "Printed"], ["striped", "Striped"], ["checked", "Checked"]] },
+  { name: "Sleeve Length", code: "sleeve_length", sortOrder: 7, isRequired: false, isVariantOption: false, values: [["half_sleeve", "Half Sleeve"], ["full_sleeve", "Full Sleeve"], ["sleeveless", "Sleeveless"]] },
 ] as const;
 
 export async function seedCategorySamples() {

@@ -11,6 +11,26 @@ const queryFields = {
   rootOnly: booleanQuery.optional(),
   parentId: z.uuid().optional(),
 };
+const categoryFields = {
+  name: z.string().trim().min(1).max(120),
+  slug,
+  description: z.string().trim().max(500).nullable().optional(),
+  imageUrl: z.url().nullable().optional(),
+  parentId: z.uuid().nullable().optional(),
+  sortOrder: z.number().int().min(0).max(2147483647).optional(),
+  isActive: z.boolean().optional(),
+};
 const compatible = (value: { rootOnly?: boolean | undefined; parentId?: string | undefined }) => !(value.rootOnly && value.parentId);
 export const publicListQuery = z.strictObject(queryFields).refine(compatible, "rootOnly=true conflicts with parentId");
+export const adminListQuery = z.strictObject({ ...queryFields, isActive: booleanQuery.optional() }).refine(compatible, "rootOnly=true conflicts with parentId");
+export const createCategoryBody = z.strictObject(categoryFields);
+export const updateCategoryBody = z.strictObject({
+  name: categoryFields.name.optional(),
+  slug: categoryFields.slug.optional(),
+  description: categoryFields.description,
+  imageUrl: categoryFields.imageUrl,
+  parentId: categoryFields.parentId,
+  sortOrder: categoryFields.sortOrder,
+  isActive: categoryFields.isActive,
+}).refine(value => Object.keys(value).length > 0, "Provide at least one field");
 export const noQuery = z.strictObject({});
