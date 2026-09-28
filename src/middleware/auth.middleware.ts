@@ -3,6 +3,7 @@ import { prisma } from "../config/database.js";
 import { logger } from "../config/logger.js";
 import { HttpError } from "../shared/errors/http-error.js";
 import { ACCESS_COOKIE, readCookie } from "../modules/auth/auth.cookies.js";
+import { ADMIN_ACCESS_COOKIE } from "../modules/admin-auth/admin-auth.cookies.js";
 import { verifyAccessToken } from "../modules/auth/token.service.js";
 import { unauthenticated } from "../modules/auth/session.service.js";
 
@@ -15,7 +16,10 @@ declare global {
 }
 
 export const authenticate: RequestHandler = async (req, _res, next) => {
-  const raw = readCookie(req, ACCESS_COOKIE);
+  const requestPath = req.originalUrl.toLowerCase();
+  const isAdmin = requestPath.startsWith("/api/admin/");
+  const adminCookie = isAdmin ? readCookie(req, ADMIN_ACCESS_COOKIE) : undefined;
+  const raw = adminCookie ?? readCookie(req, ACCESS_COOKIE);
   if (!raw) throw unauthenticated();
   let claims;
   try { claims = await verifyAccessToken(raw); } catch { throw unauthenticated(); }
@@ -25,6 +29,9 @@ export const authenticate: RequestHandler = async (req, _res, next) => {
   } });
   const now = new Date();
   if (!session || session.userId !== claims.sub || session.revokedAt || session.absoluteExpiresAt <= now || session.idleExpiresAt <= now || session.user.status !== "ACTIVE") throw unauthenticated();
+  // Customer cookies identify buyers for a 403, but cannot carry staff access.
+  if (isAdmin && !adminCookie && session.context === "STAFF") throw new HttpError(403, "FORBIDDEN", "Permission denied.");
+  if (!isAdmin && (requestPath.startsWith("/api/auth/") || requestPath.startsWith("/api/users/")) && session.context !== "CUSTOMER") throw unauthenticated();
   req.auth = { userId: session.userId, sessionId: session.id, context: session.context, mfaVerified: session.mfaVerifiedAt !== null, roles: session.user.roles.map(({ role }) => role.code) };
   next();
 };

@@ -45,4 +45,5 @@ Update accepts only `name`, `slug`, `description`, `logoUrl`, and `isActive`. Ap
 
 Only PENDING records can be approved or rejected. Repeated or reversed decisions return `409`. Duplicate normalized names or slugs return `409`.
 
-Real staff login remains pending in the auth roadmap, so Postman admin verification requires test or fixture-created STAFF sessions until that flow exists.
+Real staff login is implemented. Use the [admin authentication flow](admin-auth-api.md)
+to obtain `admin_access_token` and `admin_refresh_token` through password + MFA.

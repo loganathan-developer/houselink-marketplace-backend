@@ -69,6 +69,53 @@ model User {
   passwordCredential PasswordCredential?
   otpChallenges      OtpChallenge[]
   sessions           AuthSession[]
+  adminMfa           AdminMfaCredential?
+  adminChallenges    AdminLoginChallenge[]
+  adminRecoveryCodes AdminRecoveryCode[]
+}
+
+enum AdminChallengePurpose {
+  MFA_SETUP
+  MFA_ENROLLMENT
+  MFA_LOGIN
+}
+
+model AdminMfaCredential {
+  userId              String    @id @db.Uuid
+  encryptedSecret     String
+  activatedAt         DateTime? @db.Timestamptz(6)
+  lastAcceptedTotpStep BigInt?
+  createdAt           DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt           DateTime  @updatedAt @db.Timestamptz(6)
+  user                User      @relation(fields: [userId], references: [id], onDelete: Restrict)
+}
+
+model AdminLoginChallenge {
+  id                String                @id @default(uuid()) @db.Uuid
+  userId            String                @db.Uuid
+  tokenHash         String                @unique
+  purpose           AdminChallengePurpose
+  passwordChangedAt DateTime              @db.Timestamptz(6)
+  expiresAt         DateTime              @db.Timestamptz(6)
+  attemptCount      Int                   @default(0)
+  maxAttempts       Int                   @default(5)
+  consumedAt        DateTime?             @db.Timestamptz(6)
+  createdAt         DateTime              @default(now()) @db.Timestamptz(6)
+  user              User                  @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@index([userId, consumedAt])
+  @@index([expiresAt])
+}
+
+model AdminRecoveryCode {
+  id         String    @id @default(uuid()) @db.Uuid
+  userId     String    @db.Uuid
+  codeHash   String    @unique
+  consumedAt DateTime? @db.Timestamptz(6)
+  createdAt  DateTime  @default(now()) @db.Timestamptz(6)
+  user       User      @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@index([userId, consumedAt])
 }
 
 model UserAddress {

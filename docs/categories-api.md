@@ -3,8 +3,8 @@
 Base URL for local development: `http://localhost:5000`.
 
 The runtime exposes public category browsing and protected ADMIN category management.
-Real staff/admin login is still pending, so manual ADMIN Postman testing requires a
-future staff auth flow or a controlled automated test fixture.
+Real staff/admin login is implemented. Follow [admin authentication](admin-auth-api.md)
+to obtain a STAFF session through password + MFA before testing ADMIN APIs.
 
 ## Endpoints
 

@@ -23,7 +23,7 @@ export function registerBrandTests(deps: {
     const now = new Date(), expiresAt = new Date(now.getTime() + 600000);
     const session = await prisma.authSession.create({ data: { userId: user.id, context, mfaVerifiedAt: mfa ? now : null, lastSeenAt: now, idleExpiresAt: expiresAt, absoluteExpiresAt: expiresAt } });
     const { signAccessToken } = await import("../src/modules/auth/token.service.js");
-    return { userId: user.id, sessionId: session.id, cookie: `access_token=${await signAccessToken(user.id, session.id, expiresAt)}` };
+    return { userId: user.id, sessionId: session.id, cookie: `admin_access_token=${await signAccessToken(user.id, session.id, expiresAt)}` };
   };
 
   scenario("admin protection rejects guests, sellers, customer admin sessions and missing CSRF", async () => {

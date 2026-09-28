@@ -4,7 +4,7 @@
 
 Authentication design for the marketplace (planned features are labeled below):
 - Buyer and Seller: phone/email OTP implemented; Google login planned.
-- Staff: private password + MFA login planned; ADMIN authorization already requires a STAFF session with MFA.
+- Staff: private password + TOTP/recovery login implemented; ADMIN authorization requires a STAFF session with MFA.
 - JWT access tokens with rotating refresh tokens.
 - PostgreSQL stores identities, roles and login sessions.
 
@@ -28,6 +28,20 @@ Authentication design for the marketplace (planned features are labeled below):
   then clear both cookies with matching names and scope and an expired `Expires` date.
 
 ## Common conventions
+
+Day 8 adds three User relations through migration `20260924120000_admin_authentication`:
+
+| Model | Relation | Stored data |
+| --- | --- | --- |
+| AdminMfaCredential | One per User | AES-256-GCM encrypted secret, activation timestamp, last accepted TOTP step, timestamps |
+| AdminLoginChallenge | Many per User | Hashed random token, explicit purpose, password change timestamp, expiry, attempts, consumption timestamp |
+| AdminRecoveryCode | Many per User | User-bound random-code hash, consumption and creation timestamps |
+
+All use restrictive foreign keys. Challenge token and recovery hashes are unique;
+user/consumption and challenge expiry are indexed. Database checks enforce valid
+attempt counts and require an accepted step for active MFA. `mfaVerifiedAt` remains
+on AuthSession, not User. Admin cookies use `/api/admin` and `/api/admin/auth`.
+See [Admin Authentication API](admin-auth-api.md) for credential lifecycle and limits.
 
 - Primary IDs use UUID.
 - Dates use PostgreSQL timestamp with time zone.
@@ -118,7 +132,7 @@ Fields:
 - passwordChangedAt: timestamp.
 
 Rules:
-- Planned staff password implementation must hash passwords using Argon2id.
+- Staff passwords use Argon2id (64 MiB, three passes, parallelism one).
 - OTP-only accounts do not need this record.
 - A password alone does not grant staff access.
 - Staff sessions require successful MFA.

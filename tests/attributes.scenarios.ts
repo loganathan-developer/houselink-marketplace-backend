@@ -28,7 +28,7 @@ export function registerAttributeTests(deps: {
     const now = new Date(), expiresAt = new Date(now.getTime() + 600000);
     const session = await prisma.authSession.create({ data: { userId: user.id, context: "STAFF", mfaVerifiedAt: now, lastSeenAt: now, idleExpiresAt: expiresAt, absoluteExpiresAt: expiresAt } });
     const { signAccessToken } = await import("../src/modules/auth/token.service.js");
-    return { userId: user.id, cookie: `access_token=${await signAccessToken(user.id, session.id, expiresAt)}` };
+    return { userId: user.id, cookie: `admin_access_token=${await signAccessToken(user.id, session.id, expiresAt)}` };
   };
 
   scenario("public API exposes active attributes and values in configured order for guests and buyers", async () => {

@@ -22,20 +22,21 @@ async function issueTokens(tx: Prisma.TransactionClient, session: { id: string; 
   return { record, tokens: { accessToken, refreshToken, accessExpiresAt, refreshExpiresAt } };
 }
 
-export async function createSession(tx: Prisma.TransactionClient, userId: string): Promise<AuthTokens> {
+export async function createSession(tx: Prisma.TransactionClient, userId: string, context: "CUSTOMER" | "STAFF" = "CUSTOMER"): Promise<AuthTokens> {
   await lockUser(tx, userId);
-  const user = await tx.user.findUnique({ where: { id: userId }, select: { status: true } });
+  const user = await tx.user.findUnique({ where: { id: userId }, select: { status: true, roles: { select: { role: { select: { code: true } } } } } });
   if (user?.status !== "ACTIVE") throw unauthenticated();
+  if (context === "STAFF" && !user.roles.some(({ role }) => role.code === "ADMIN")) throw unauthenticated();
   const now = new Date();
   const absoluteExpiresAt = new Date(now.getTime() + env.SESSION_ABSOLUTE_EXPIRES_IN_SECONDS * 1000);
   const session = await tx.authSession.create({ data: {
-    userId, context: "CUSTOMER", lastSeenAt: now, absoluteExpiresAt,
+    userId, context, mfaVerifiedAt: context === "STAFF" ? now : null, lastSeenAt: now, absoluteExpiresAt,
     idleExpiresAt: new Date(Math.min(absoluteExpiresAt.getTime(), now.getTime() + env.SESSION_IDLE_EXPIRES_IN_SECONDS * 1000)),
   } });
   return (await issueTokens(tx, session, now)).tokens;
 }
 
-export async function rotateRefreshToken(raw: string | undefined): Promise<AuthTokens> {
+export async function rotateRefreshToken(raw: string | undefined, context: "CUSTOMER" | "STAFF" = "CUSTOMER"): Promise<AuthTokens> {
   if (!raw || !/^[A-Za-z0-9_-]{43}$/.test(raw)) throw unauthenticated();
   const tokenHash = hashRefreshToken(raw);
   const result = await prisma.$transaction(async (tx) => {
@@ -43,10 +44,11 @@ export async function rotateRefreshToken(raw: string | undefined): Promise<AuthT
     if (!initial) return null;
     // A common user lock serializes rotation, logout, logout-all and login session creation.
     await lockUser(tx, initial.session.userId);
-    const token = await tx.refreshToken.findUnique({ where: { tokenHash }, include: { session: { include: { user: { select: { status: true } } } } } });
+    const token = await tx.refreshToken.findUnique({ where: { tokenHash }, include: { session: { include: { user: { select: { status: true, roles: { select: { role: { select: { code: true } } } } } } } } } });
     if (!token) return null;
     const now = new Date();
     const session = token.session;
+    if (session.context !== context || (context === "STAFF" && (!session.mfaVerifiedAt || !session.user.roles.some(({ role }) => role.code === "ADMIN")))) return null;
     if (token.consumedAt) {
       await tx.authSession.updateMany({ where: { id: session.id, revokedAt: null }, data: { revokedAt: now } });
       await tx.refreshToken.updateMany({ where: { sessionId: session.id, revokedAt: null }, data: { revokedAt: now } });
@@ -71,7 +73,7 @@ export async function rotateRefreshToken(raw: string | undefined): Promise<AuthT
   return result.tokens;
 }
 
-export async function revokeSessionFromCookies(refresh: string | undefined, access: string | undefined) {
+export async function revokeSessionFromCookies(refresh: string | undefined, access: string | undefined, context: "CUSTOMER" | "STAFF" = "CUSTOMER") {
   let sessionId: string | undefined;
   if (refresh && /^[A-Za-z0-9_-]{43}$/.test(refresh)) {
     const token = await prisma.refreshToken.findUnique({ where: { tokenHash: hashRefreshToken(refresh) }, select: { sessionId: true } });
@@ -81,16 +83,16 @@ export async function revokeSessionFromCookies(refresh: string | undefined, acce
     try { sessionId = (await verifyAccessToken(access)).sid; } catch { /* Invalid credentials still allow cookie clearing. */ }
   }
   if (!sessionId) return;
-  const session = await prisma.authSession.findUnique({ where: { id: sessionId }, select: { userId: true } });
-  if (!session) return;
-  await revokeSessions(session.userId, sessionId);
+  const session = await prisma.authSession.findUnique({ where: { id: sessionId }, select: { userId: true, context: true } });
+  if (!session || session.context !== context) return;
+  await revokeSessions(session.userId, sessionId, context);
 }
 
-export async function revokeSessions(userId: string, sessionId?: string) {
+export async function revokeSessions(userId: string, sessionId?: string, context?: "CUSTOMER" | "STAFF") {
   await prisma.$transaction(async (tx) => {
     await lockUser(tx, userId);
     const now = new Date();
-    const where = { userId, ...(sessionId ? { id: sessionId } : {}) };
+    const where = { userId, ...(sessionId ? { id: sessionId } : {}), ...(context ? { context } : {}) };
     await tx.authSession.updateMany({ where: { ...where, revokedAt: null }, data: { revokedAt: now } });
     await tx.refreshToken.updateMany({ where: { session: where, revokedAt: null }, data: { revokedAt: now } });
   });
