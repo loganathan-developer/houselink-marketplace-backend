@@ -14,6 +14,8 @@ import attributeAdminRoutes from "./modules/attributes/attribute.admin.routes.js
 import categoryAttributeAdminRoutes from "./modules/attributes/category-attribute.admin.routes.js";
 import brandRoutes from "./modules/brands/brand.routes.js";
 import brandAdminRoutes from "./modules/brands/brand.admin.routes.js";
+import mediaRoutes from "./modules/media/media.routes.js";
+import { localStorage } from "./modules/media/local-storage.adapter.js";
 import { env } from "./config/env.js";
 import { prisma } from "./config/database.js";
 import { HttpError } from "./shared/errors/http-error.js";
@@ -28,8 +30,18 @@ app.use(corsMiddleware);
 app.use(csrfProtection);
 app.use(express.json({ limit: "16kb" }));
 app.use(cookieParser());
+const staticOptions = {
+  dotfiles: "deny" as const,
+  fallthrough: false,
+  index: false,
+  maxAge: "1d",
+  setHeaders: (res: express.Response) => res.setHeader("Cross-Origin-Resource-Policy", "cross-origin"),
+};
+app.use("/uploads/categories", express.static(localStorage.directory("categories"), staticOptions));
+app.use("/uploads/brands", express.static(localStorage.directory("brands"), staticOptions));
 app.use("/api/auth", authRoutes);
 app.use("/api/admin/auth", adminAuthRoutes);
+app.use("/api/admin/media", mediaRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/admin/attributes", attributeAdminRoutes);
 app.use("/api/admin/brands", brandAdminRoutes);

@@ -16,21 +16,26 @@ const categoryFields = {
   slug,
   description: z.string().trim().max(500).nullable().optional(),
   imageUrl: z.url().nullable().optional(),
+  imageMediaId: z.uuid().nullable().optional(),
   parentId: z.uuid().nullable().optional(),
   sortOrder: z.number().int().min(0).max(2147483647).optional(),
   isActive: z.boolean().optional(),
 };
+const noImageConflict = (value: { imageUrl?: string | null | undefined; imageMediaId?: string | null | undefined }) =>
+  !(Object.hasOwn(value, "imageUrl") && Object.hasOwn(value, "imageMediaId"));
 const compatible = (value: { rootOnly?: boolean | undefined; parentId?: string | undefined }) => !(value.rootOnly && value.parentId);
 export const publicListQuery = z.strictObject(queryFields).refine(compatible, "rootOnly=true conflicts with parentId");
 export const adminListQuery = z.strictObject({ ...queryFields, isActive: booleanQuery.optional() }).refine(compatible, "rootOnly=true conflicts with parentId");
-export const createCategoryBody = z.strictObject(categoryFields);
+export const createCategoryBody = z.strictObject(categoryFields).refine(noImageConflict, "imageUrl conflicts with imageMediaId");
 export const updateCategoryBody = z.strictObject({
   name: categoryFields.name.optional(),
   slug: categoryFields.slug.optional(),
   description: categoryFields.description,
   imageUrl: categoryFields.imageUrl,
+  imageMediaId: categoryFields.imageMediaId,
   parentId: categoryFields.parentId,
   sortOrder: categoryFields.sortOrder,
   isActive: categoryFields.isActive,
-}).refine(value => Object.keys(value).length > 0, "Provide at least one field");
+}).refine(value => Object.keys(value).length > 0, "Provide at least one field")
+  .refine(noImageConflict, "imageUrl conflicts with imageMediaId");
 export const noQuery = z.strictObject({});

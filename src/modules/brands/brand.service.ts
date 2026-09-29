@@ -3,11 +3,19 @@ import { Prisma, type Brand } from "../../generated/prisma/client.js";
 import { HttpError } from "../../shared/errors/http-error.js";
 import { normalizeBrandName, slugFromName } from "./brand.schema.js";
 import type { BrandCreate, BrandQuery, BrandUpdate } from "./brand.types.js";
+import { mediaPublicUrl, requireMediaPurpose } from "../media/media.service.js";
 
 const missing = () => new HttpError(404, "BRAND_NOT_FOUND", "Brand not found.");
 const conflict = (code = "BRAND_CONFLICT", message = "Brand conflict.") => new HttpError(409, code, message);
 const compact = <T extends Record<string, unknown>>(input: T) => Object.fromEntries(Object.entries(input).filter(([, value]) => value !== undefined));
-const publicSelect = { id: true, name: true, slug: true, description: true, logoUrl: true } as const;
+const publicSelect = { id: true, name: true, slug: true, description: true, logoUrl: true,
+  logoMedia: { select: { storageKey: true } } } as const;
+const mediaInclude = { logoMedia: { select: { storageKey: true } } } as const;
+
+function presentBrand<T extends { logoUrl: string | null; logoMedia?: { storageKey: string } | null }>(brand: T) {
+  const { logoMedia, ...value } = brand;
+  return { ...value, logoUrl: logoMedia ? mediaPublicUrl(logoMedia.storageKey) : brand.logoUrl };
+}
 
 function mapWriteError(error: unknown): never {
   if (error instanceof HttpError) throw error;
@@ -32,25 +40,24 @@ function whereFor(query: BrandQuery, admin: boolean): Prisma.BrandWhereInput {
 
 export async function listBrands(query: BrandQuery, admin = false) {
   const where = whereFor(query, admin);
-  const findArgs = {
-    where,
-    orderBy: [{ name: "asc" as const }, { id: "asc" as const }],
-    skip: (query.page - 1) * query.limit,
-    take: query.limit,
-    ...(admin ? {} : { select: publicSelect }),
-  };
-  const [brands, total] = await prisma.$transaction([
-    prisma.brand.findMany(findArgs),
-    prisma.brand.count({ where }),
-  ], { isolationLevel: "RepeatableRead" });
-  return { brands, pagination: { page: query.page, limit: query.limit, total, totalPages: Math.ceil(total / query.limit) } };
+  const common = { where, orderBy: [{ name: "asc" as const }, { id: "asc" as const }],
+    skip: (query.page - 1) * query.limit, take: query.limit };
+  const [brands, total] = await prisma.$transaction(async (tx) => {
+    const rows = admin
+      ? await tx.brand.findMany({ ...common, include: mediaInclude })
+      : await tx.brand.findMany({ ...common, select: publicSelect });
+    return [rows, await tx.brand.count({ where })] as const;
+  }, { isolationLevel: "RepeatableRead" });
+  return { brands: brands.map(presentBrand), pagination: { page: query.page, limit: query.limit, total, totalPages: Math.ceil(total / query.limit) } };
 }
 
 export async function brandDetail(key: { id: string } | { slug: string }, admin = false) {
   const where = "id" in key ? { id: key.id } : { slug: key.slug };
-  const brand = await prisma.brand.findFirst({ where: { ...where, ...(admin ? {} : { status: "APPROVED" as const, isActive: true }) }, ...(admin ? {} : { select: publicSelect }) });
+  const brand = admin
+    ? await prisma.brand.findFirst({ where, include: mediaInclude })
+    : await prisma.brand.findFirst({ where: { ...where, status: "APPROVED", isActive: true }, select: publicSelect });
   if (!brand) throw missing();
-  return brand;
+  return presentBrand(brand);
 }
 
 export async function createBrand(input: BrandCreate) {
@@ -59,31 +66,35 @@ export async function createBrand(input: BrandCreate) {
   if (!slug) throw new HttpError(400, "VALIDATION_ERROR", "Invalid request", [{ path: "body.slug", message: "Generated slug is empty" }]);
   const status = input.status ?? "PENDING";
   try {
+    if (input.logoMediaId) await requireMediaPurpose(input.logoMediaId, "BRAND_LOGO");
     const data = compact({
       name: input.name,
       normalizedName,
       slug,
       description: input.description,
       logoUrl: input.logoUrl,
+      logoMediaId: input.logoMediaId,
       status,
       isActive: input.isActive ?? true,
       approvedAt: status === "APPROVED" ? new Date() : undefined,
     }) as Prisma.BrandCreateInput;
-    return await prisma.brand.create({ data });
+    return presentBrand(await prisma.brand.create({ data, include: mediaInclude }));
   } catch (error) { mapWriteError(error); }
 }
 
 export async function updateBrand(id: string, input: BrandUpdate) {
+  if (input.logoMediaId) await requireMediaPurpose(input.logoMediaId, "BRAND_LOGO");
   const data: Prisma.BrandUpdateInput = compact({
     name: input.name,
     normalizedName: input.name === undefined ? undefined : normalizeBrandName(input.name),
     slug: input.slug,
     description: input.description,
     logoUrl: input.logoUrl,
+    logoMediaId: input.logoMediaId,
     isActive: input.isActive,
   });
   try {
-    return await prisma.brand.update({ where: { id }, data });
+    return presentBrand(await prisma.brand.update({ where: { id }, data, include: mediaInclude }));
   } catch (error) { mapWriteError(error); }
 }
 
@@ -93,7 +104,7 @@ export async function approveBrand(id: string) {
     where: { id, status: "PENDING" },
     data: { status: "APPROVED", approvedAt: now, rejectedAt: null, rejectionReason: null },
   });
-  if (result[0]) return result[0];
+  if (result[0]) return brandDetail({ id }, true);
   if (await prisma.brand.findUnique({ where: { id }, select: { id: true } })) throw conflict("BRAND_REVIEW_CONFLICT", "Brand has already received a review decision.");
   throw missing();
 }
@@ -104,7 +115,7 @@ export async function rejectBrand(id: string, reason: string) {
     where: { id, status: "PENDING" },
     data: { status: "REJECTED", rejectedAt: now, rejectionReason: reason, approvedAt: null },
   });
-  if (result[0]) return result[0];
+  if (result[0]) return brandDetail({ id }, true);
   if (await prisma.brand.findUnique({ where: { id }, select: { id: true } })) throw conflict("BRAND_REVIEW_CONFLICT", "Brand has already received a review decision.");
   throw missing();
 }

@@ -1,0 +1,51 @@
+{
+  "info": {
+    "name": "HouseLink Media Management",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:5000" },
+    { "key": "frontendOrigin", "value": "http://localhost:3000" },
+    { "key": "mediaId", "value": "" },
+    { "key": "categoryId", "value": "" },
+    { "key": "brandId", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Upload category image",
+      "event": [{ "listen": "test", "script": { "exec": ["const body = pm.response.json();", "if (body.data?.media?.id) pm.collectionVariables.set('mediaId', body.data.media.id);"] } }],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "X-CSRF-Protection", "value": "1" }, { "key": "Origin", "value": "{{frontendOrigin}}" }],
+        "body": { "mode": "formdata", "formdata": [{ "key": "purpose", "value": "CATEGORY_IMAGE", "type": "text" }, { "key": "file", "type": "file", "src": "" }] },
+        "url": "{{baseUrl}}/api/admin/media"
+      }
+    },
+    {
+      "name": "Attach category image",
+      "request": {
+        "method": "PATCH",
+        "header": [{ "key": "Content-Type", "value": "application/json" }, { "key": "X-CSRF-Protection", "value": "1" }, { "key": "Origin", "value": "{{frontendOrigin}}" }],
+        "body": { "mode": "raw", "raw": "{\"imageMediaId\":\"{{mediaId}}\"}" },
+        "url": "{{baseUrl}}/api/admin/categories/{{categoryId}}"
+      }
+    },
+    {
+      "name": "Attach brand logo",
+      "request": {
+        "method": "PATCH",
+        "header": [{ "key": "Content-Type", "value": "application/json" }, { "key": "X-CSRF-Protection", "value": "1" }, { "key": "Origin", "value": "{{frontendOrigin}}" }],
+        "body": { "mode": "raw", "raw": "{\"logoMediaId\":\"{{mediaId}}\"}" },
+        "url": "{{baseUrl}}/api/admin/brands/{{brandId}}"
+      }
+    },
+    {
+      "name": "Delete unused media",
+      "request": {
+        "method": "DELETE",
+        "header": [{ "key": "X-CSRF-Protection", "value": "1" }, { "key": "Origin", "value": "{{frontendOrigin}}" }],
+        "url": "{{baseUrl}}/api/admin/media/{{mediaId}}"
+      }
+    }
+  ]
+}

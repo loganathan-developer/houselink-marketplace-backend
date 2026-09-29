@@ -13,6 +13,9 @@ const booleanQuery = z.enum(["true", "false"]).transform(value => value === "tru
 const name = z.string().transform(displayBrandName).pipe(z.string().min(1).max(120)).refine(value => normalizeBrandName(value).length <= 120);
 const nullableText = (max: number) => z.string().trim().max(max).nullable().optional();
 const logoUrl = z.url({ protocol: /^https?$/ }).max(2048).nullable().optional();
+const logoMediaId = z.uuid().nullable().optional();
+const noLogoConflict = (value: { logoUrl?: string | null | undefined; logoMediaId?: string | null | undefined }) =>
+  !(Object.hasOwn(value, "logoUrl") && Object.hasOwn(value, "logoMediaId"));
 
 export const brandParams = z.strictObject({ brandId: z.uuid() });
 export const slugParams = z.strictObject({ slug });
@@ -33,13 +36,16 @@ export const createBrandBody = z.strictObject({
   slug: slug.optional(),
   description: nullableText(2000),
   logoUrl,
+  logoMediaId,
   status: z.enum(["PENDING", "APPROVED"]).optional(),
   isActive: z.boolean().optional(),
-});
+}).refine(noLogoConflict, "logoUrl conflicts with logoMediaId");
 export const updateBrandBody = z.strictObject({
   name: name.optional(),
   slug: slug.optional(),
   description: nullableText(2000),
   logoUrl,
+  logoMediaId,
   isActive: z.boolean().optional(),
-}).refine(value => Object.keys(value).length > 0, "Provide at least one field");
+}).refine(value => Object.keys(value).length > 0, "Provide at least one field")
+  .refine(noLogoConflict, "logoUrl conflicts with logoMediaId");

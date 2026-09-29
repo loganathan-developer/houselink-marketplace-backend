@@ -13,6 +13,7 @@ export type BrandCreate = {
   slug?: string;
   description?: string | null;
   logoUrl?: string | null;
+  logoMediaId?: string | null;
   status?: "PENDING" | "APPROVED";
   isActive?: boolean;
 };
@@ -22,5 +23,6 @@ export type BrandUpdate = {
   slug?: string;
   description?: string | null;
   logoUrl?: string | null;
+  logoMediaId?: string | null;
   isActive?: boolean;
 };

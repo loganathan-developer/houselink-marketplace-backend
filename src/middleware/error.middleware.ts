@@ -1,12 +1,16 @@
 import type { ErrorRequestHandler } from "express";
 import { logger } from "../config/logger.js";
 import { HttpError } from "../shared/errors/http-error.js";
+import multer from "multer";
 
 const hasType = (error: unknown, type: string): boolean =>
   typeof error === "object" &&
   error !== null &&
   "type" in error &&
   error.type === type;
+
+const hasCode = (error: unknown, code: string): boolean =>
+  typeof error === "object" && error !== null && "code" in error && error.code === code;
 
 export const errorHandler: ErrorRequestHandler = (error, _req, res, next) => {
   if (res.headersSent) {
@@ -17,6 +21,12 @@ export const errorHandler: ErrorRequestHandler = (error, _req, res, next) => {
   const httpError =
     error instanceof HttpError
       ? error
+      : error instanceof multer.MulterError
+        ? error.code === "LIMIT_FILE_SIZE"
+          ? new HttpError(413, "IMAGE_TOO_LARGE", "Image exceeds the upload byte limit.")
+          : new HttpError(400, "INVALID_MULTIPART", "Invalid multipart upload.")
+      : hasCode(error, "ENOENT")
+        ? new HttpError(404, "MEDIA_FILE_NOT_FOUND", "Media file not found.")
       : hasType(error, "entity.parse.failed")
         ? new HttpError(400, "INVALID_JSON", "Malformed JSON request body")
         : hasType(error, "entity.too.large")

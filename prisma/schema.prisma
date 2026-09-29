@@ -56,14 +56,19 @@ enum BrandStatus {
   REJECTED
 }
 
+enum MediaPurpose {
+  CATEGORY_IMAGE
+  BRAND_LOGO
+}
+
 model User {
-  id                 String              @id @default(uuid()) @db.Uuid
+  id                 String                @id @default(uuid()) @db.Uuid
   name               String?
   profileImage       String?
   addresses          UserAddress[]
-  status             UserStatus          @default(ACTIVE)
-  createdAt          DateTime            @default(now()) @db.Timestamptz(6)
-  updatedAt          DateTime            @updatedAt @db.Timestamptz(6)
+  status             UserStatus            @default(ACTIVE)
+  createdAt          DateTime              @default(now()) @db.Timestamptz(6)
+  updatedAt          DateTime              @updatedAt @db.Timestamptz(6)
   roles              UserRole[]
   identities         AuthIdentity[]
   passwordCredential PasswordCredential?
@@ -72,6 +77,7 @@ model User {
   adminMfa           AdminMfaCredential?
   adminChallenges    AdminLoginChallenge[]
   adminRecoveryCodes AdminRecoveryCode[]
+  uploadedMedia      Media[]
 }
 
 enum AdminChallengePurpose {
@@ -81,13 +87,13 @@ enum AdminChallengePurpose {
 }
 
 model AdminMfaCredential {
-  userId              String    @id @db.Uuid
-  encryptedSecret     String
-  activatedAt         DateTime? @db.Timestamptz(6)
+  userId               String    @id @db.Uuid
+  encryptedSecret      String
+  activatedAt          DateTime? @db.Timestamptz(6)
   lastAcceptedTotpStep BigInt?
-  createdAt           DateTime  @default(now()) @db.Timestamptz(6)
-  updatedAt           DateTime  @updatedAt @db.Timestamptz(6)
-  user                User      @relation(fields: [userId], references: [id], onDelete: Restrict)
+  createdAt            DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt            DateTime  @updatedAt @db.Timestamptz(6)
+  user                 User      @relation(fields: [userId], references: [id], onDelete: Restrict)
 }
 
 model AdminLoginChallenge {
@@ -138,22 +144,25 @@ model UserAddress {
 }
 
 model Category {
-  id          String              @id @default(uuid()) @db.Uuid
-  name        String
-  slug        String              @unique
-  description String?
-  imageUrl    String?
-  parentId    String?             @db.Uuid
-  parent      Category?           @relation("CategoryHierarchy", fields: [parentId], references: [id], onDelete: Restrict)
-  children    Category[]          @relation("CategoryHierarchy")
-  attributes  CategoryAttribute[]
-  isActive    Boolean             @default(true)
-  sortOrder   Int                 @default(0)
-  createdAt   DateTime            @default(now()) @db.Timestamptz(6)
-  updatedAt   DateTime            @updatedAt @db.Timestamptz(6)
+  id           String              @id @default(uuid()) @db.Uuid
+  name         String
+  slug         String              @unique
+  description  String?
+  imageUrl     String?
+  imageMediaId String?             @db.Uuid
+  imageMedia   Media?              @relation("CategoryImageMedia", fields: [imageMediaId], references: [id], onDelete: Restrict)
+  parentId     String?             @db.Uuid
+  parent       Category?           @relation("CategoryHierarchy", fields: [parentId], references: [id], onDelete: Restrict)
+  children     Category[]          @relation("CategoryHierarchy")
+  attributes   CategoryAttribute[]
+  isActive     Boolean             @default(true)
+  sortOrder    Int                 @default(0)
+  createdAt    DateTime            @default(now()) @db.Timestamptz(6)
+  updatedAt    DateTime            @updatedAt @db.Timestamptz(6)
 
   @@index([parentId, sortOrder])
   @@index([isActive])
+  @@index([imageMediaId])
 }
 
 model Attribute {
@@ -212,6 +221,8 @@ model Brand {
   slug            String      @unique @db.VarChar(160)
   description     String?     @db.VarChar(2000)
   logoUrl         String?     @db.VarChar(2048)
+  logoMediaId     String?     @db.Uuid
+  logoMedia       Media?      @relation("BrandLogoMedia", fields: [logoMediaId], references: [id], onDelete: Restrict)
   status          BrandStatus @default(PENDING)
   isActive        Boolean     @default(true)
   rejectionReason String?     @db.VarChar(1000)
@@ -221,6 +232,25 @@ model Brand {
   updatedAt       DateTime    @updatedAt @db.Timestamptz(3)
 
   @@index([status, isActive, name, id])
+  @@index([logoMediaId])
+}
+
+model Media {
+  id           String       @id @default(uuid()) @db.Uuid
+  storageKey   String       @unique @db.VarChar(512)
+  mimeType     String       @db.VarChar(100)
+  sizeBytes    Int
+  width        Int
+  height       Int
+  purpose      MediaPurpose
+  uploadedById String       @db.Uuid
+  createdAt    DateTime     @default(now()) @db.Timestamptz(6)
+  uploadedBy   User         @relation(fields: [uploadedById], references: [id], onDelete: Restrict)
+  categories   Category[]   @relation("CategoryImageMedia")
+  brands       Brand[]      @relation("BrandLogoMedia")
+
+  @@index([purpose])
+  @@index([uploadedById])
 }
 
 model Role {

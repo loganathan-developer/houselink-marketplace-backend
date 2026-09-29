@@ -14,6 +14,12 @@ const envSchema = z.object({
     .max(65535)
     .default(5000),
 
+  UPLOAD_DIR: z.string().trim().min(1).default("uploads"),
+  PUBLIC_BASE_URL: z.string().url().refine((value) => ["http:", "https:"].includes(new URL(value).protocol),
+    "PUBLIC_BASE_URL must be an HTTP(S) URL").default("http://localhost:5000"),
+  MAX_IMAGE_UPLOAD_BYTES: z.coerce.number().int().positive().default(5_242_880),
+  MAX_IMAGE_PIXELS: z.coerce.number().int().positive().default(20_000_000),
+
   DATABASE_URL: z
     .string()
     .min(1, "DATABASE_URL is required")

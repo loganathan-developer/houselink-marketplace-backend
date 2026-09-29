@@ -3,11 +3,25 @@ import { prisma } from "../../config/database.js";
 import { Prisma, type Category } from "../../generated/prisma/client.js";
 import { HttpError } from "../../shared/errors/http-error.js";
 import type { Breadcrumb, CategoryCreate, CategoryNode, CategoryQuery, CategoryUpdate } from "./category.types.js";
+import { mediaPublicUrl, requireMediaPurpose } from "../media/media.service.js";
 
 export const CATEGORY_LOCK = 712345678901n;
 export const MAX_CATEGORY_DEPTH = 64;
 const missing = () => new HttpError(404, "CATEGORY_NOT_FOUND", "Category not found.");
 const compact = <T extends Record<string, unknown>>(input: T) => Object.fromEntries(Object.entries(input).filter(([, value]) => value !== undefined));
+
+async function resolveImageUrls<T extends Category>(categories: T[], tx: Prisma.TransactionClient | typeof prisma = prisma): Promise<T[]> {
+  const ids = categories.flatMap((category) => category.imageMediaId ? [category.imageMediaId] : []);
+  if (!ids.length) return categories;
+  const media = await tx.media.findMany({ where: { id: { in: ids } }, select: { id: true, storageKey: true } });
+  const urls = new Map(media.map((item) => [item.id, mediaPublicUrl(item.storageKey)]));
+  return categories.map((category) => ({ ...category, imageUrl: category.imageMediaId ? urls.get(category.imageMediaId) ?? category.imageUrl : category.imageUrl }));
+}
+
+const publicCategory = <T extends Category>(category: T) => {
+  const { imageMediaId: _imageMediaId, ...value } = category;
+  return value;
+};
 
 const visible = Prisma.sql`WITH RECURSIVE visible AS (
   SELECT "id", 1 AS depth FROM "Category" WHERE "parentId" IS NULL AND "isActive" = true
@@ -29,15 +43,17 @@ export async function listCategories(query: CategoryQuery, admin = false) {
     prisma.$queryRaw<{ total: number }[]>`${countSource}`,
   ], { isolationLevel: "RepeatableRead" });
   const total = count[0]!.total;
-  return { categories, pagination: { page: query.page, limit: query.limit, total, totalPages: Math.ceil(total / query.limit) } };
+  const resolved = await resolveImageUrls(categories);
+  return { categories: admin ? resolved : resolved.map(publicCategory), pagination: { page: query.page, limit: query.limit, total, totalPages: Math.ceil(total / query.limit) } };
 }
 
 export async function categoryTree(): Promise<CategoryNode[]> {
   const categories = await prisma.$queryRaw<Category[]>`${visible} SELECT c.* FROM "Category" c
     JOIN visible v ON v."id" = c."id" ORDER BY c."sortOrder", c."id"`;
-  const nodes = new Map(categories.map(category => [category.id, { ...category, children: [] } as CategoryNode]));
+  const resolved = (await resolveImageUrls(categories)).map(publicCategory);
+  const nodes = new Map(resolved.map(category => [category.id, { ...category, children: [] } as CategoryNode]));
   const roots: CategoryNode[] = [];
-  for (const category of categories) {
+  for (const category of resolved) {
     const node = nodes.get(category.id)!;
     if (category.parentId === null) roots.push(node);
     else nodes.get(category.parentId)?.children.push(node);
@@ -55,8 +71,9 @@ export async function categoryDetail(key: { id: string } | { slug: string }, adm
   ) SELECT * FROM ancestors ORDER BY depth`;
   if (!rows.length || (!admin && rows.some(row => !row.isActive)) || rows.at(-1)!.parentId !== null) throw missing();
   const { depth: _depth, ...category } = rows[0]!;
+  const [resolved] = await resolveImageUrls([category]);
   const breadcrumbs: Breadcrumb[] = [...rows].reverse().map(({ id, name, slug }) => ({ id, name, slug }));
-  return { ...category, breadcrumbs };
+  return { ...(admin ? resolved! : publicCategory(resolved!)), breadcrumbs };
 }
 
 async function validateHierarchy(tx: Prisma.TransactionClient, id: string, parentId: string | null | undefined) {
@@ -78,9 +95,11 @@ export async function saveCategory(input: CategoryCreate | CategoryUpdate, id = 
       if (!existing && !("name" in input && "slug" in input)) throw missing();
       if (input.parentId) await tx.category.findUniqueOrThrow({ where: { id: input.parentId } });
       await validateHierarchy(tx, id, input.parentId);
-      return existing
+      if (input.imageMediaId) await requireMediaPurpose(input.imageMediaId, "CATEGORY_IMAGE", tx);
+      const saved = await (existing
         ? tx.category.update({ where: { id }, data: compact(input) as Prisma.CategoryUncheckedUpdateInput })
-        : tx.category.create({ data: compact({ id, ...(input as CategoryCreate) }) as Prisma.CategoryUncheckedCreateInput });
+        : tx.category.create({ data: compact({ id, ...(input as CategoryCreate) }) as Prisma.CategoryUncheckedCreateInput }));
+      return (await resolveImageUrls([saved], tx))[0]!;
     }, { isolationLevel: "Serializable" });
   } catch (error) {
     if (error instanceof HttpError) throw error;
