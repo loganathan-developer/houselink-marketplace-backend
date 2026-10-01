@@ -2,7 +2,8 @@ import { z } from "zod";
 
 const text = (max: number) => z.string().trim().min(1).max(max);
 export const profileBody = z.strictObject({
-  name: text(100).optional(),
+  name: text(100).nullable().optional(),
+  email: z.string().trim().toLowerCase().pipe(z.email().max(254)).nullable().optional(),
   profileImage: z.url().max(2048).refine(value => URL.canParse(value) && new URL(value).protocol === "https:", "Use an HTTPS image URL").nullable().optional(),
 }).refine(value => Object.keys(value).length > 0, "Provide at least one field");
 

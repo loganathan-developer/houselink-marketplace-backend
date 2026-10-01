@@ -85,9 +85,17 @@ export function registerAttributeTests(deps: {
     const response = await send(`/categories/${category.id}/attributes`);
     assert.equal(response.status, 200);
     const attributes = (await response.json()).data.attributes;
-    assert.deepEqual(attributes.map((attribute: { code: string }) => attribute.code), ["brand", "size", "color", "fabric", "fit", "pattern", "sleeve_length"]);
+    assert.deepEqual(attributes.map((attribute: { code: string }) => attribute.code), ["brand", "size", "color", "fabric", "fit", "pattern", "sleeve_length", "material", "occasion", "gender"]);
     assert.equal(attributes[0].isVariantOption, false);
     assert.deepEqual(attributes[1].values.map((value: { label: string }) => value.label), ["S", "M", "L", "XL"]);
+
+    const heels = await prisma.category.findUniqueOrThrow({ where: { slug: "women-footwear-heels" } });
+    const heelAttributes = (await (await send(`/categories/${heels.id}/attributes`)).json()).data.attributes;
+    assert.deepEqual(heelAttributes.map((attribute: { code: string }) => attribute.code), ["shoe_size", "color", "material", "occasion", "gender", "heel_type", "sole_material"]);
+
+    const foundation = await prisma.category.findUniqueOrThrow({ where: { slug: "beauty-makeup-foundation" } });
+    const beautyAttributes = (await (await send(`/categories/${foundation.id}/attributes`)).json()).data.attributes;
+    assert.deepEqual(beautyAttributes.map((attribute: { code: string }) => attribute.code), ["beauty_type", "skin_type", "hair_type", "finish", "shade_color", "fragrance_type"]);
   });
 
   scenario("admin attribute APIs enforce authorization and validation", async () => {

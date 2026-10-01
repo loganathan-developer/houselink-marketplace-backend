@@ -10,6 +10,8 @@ import { registerAttributeTests } from "./attributes.scenarios.js";
 import { registerBrandTests } from "./brands.scenarios.js";
 import { registerAdminAuthTests } from "./admin-auth.scenarios.js";
 import { registerMediaTests } from "./media.scenarios.js";
+import { registerCartTests } from "./cart.scenarios.js";
+import { registerWishlistTests } from "./wishlist.scenarios.js";
 import { spawn } from "node:child_process";
 import { setTimeout as delay } from "node:timers/promises";
 import pg from "pg";
@@ -173,7 +175,7 @@ test("buyer profile get/update exposes only profile data and rejects protected f
   assert.equal(initial.status, 200);
   const initialUser = (await initial.json()).data.user;
   assert.equal(initialUser.id, auth.userId);
-  assert.deepEqual(Object.keys(initialUser).sort(), ["createdAt", "id", "name", "profileImage", "updatedAt"]);
+  assert.deepEqual(Object.keys(initialUser).sort(), ["createdAt", "email", "id", "name", "profileImage", "updatedAt"]);
   const protectedState = () => prisma.user.findUniqueOrThrow({ where: { id: auth.userId }, select: {
     status: true, roles: true, identities: true, passwordCredential: true,
   } });
@@ -181,7 +183,7 @@ test("buyer profile get/update exposes only profile data and rejects protected f
   const updated = await userRequest("", auth.cookie, { name: " Buyer Name ", profileImage: "https://example.com/avatar.png" }, "PATCH");
   assert.equal(updated.status, 200);
   assert.equal((await updated.json()).data.user.name, "Buyer Name");
-  for (const field of ["roles", "status", "phone", "email", "verifiedAt", "AuthIdentity", "identities", "passwordCredential", "password", "userId"]) {
+  for (const field of ["roles", "status", "phone", "contactEmail", "verifiedAt", "AuthIdentity", "identities", "passwordCredential", "password", "userId"]) {
     assert.equal((await userRequest("", auth.cookie, { name: "Changed", [field]: "forbidden" }, "PATCH")).status, 400);
   }
   for (const body of [{}, { name: " " }, { profileImage: "javascript:alert(1)" }]) {
@@ -224,6 +226,32 @@ test("buyer addresses CRUD, relation, default replacement and default deletion",
   assert.equal((await userRequest(`/addresses/${first}`, auth.cookie, {}, "DELETE")).status, 404);
 });
 
+test("buyer contact email updates profile and header data without modifying login identity or address names", async () => {
+  const auth = await login();
+  const identities = await prisma.authIdentity.findMany({ where: { userId: auth.userId } });
+  const addressResponse = await userRequest("/addresses", auth.cookie, { ...sampleAddress, recipientName: "Different Recipient" });
+  assert.equal(addressResponse.status, 201);
+  const updated = await userRequest("", auth.cookie, { name: " Logu ", email: " CONTACT@Example.COM " }, "PATCH");
+  assert.equal(updated.status, 200);
+  const profile = (await updated.json()).data.user;
+  assert.equal(profile.name, "Logu");
+  assert.equal(profile.email, "contact@example.com");
+  const current = (await (await request("/me", auth.cookie)).json()).data.user;
+  assert.equal(current.name, "Logu");
+  assert.equal(current.email, "contact@example.com");
+  assert.equal(current.phone, auth.phone);
+  assert.equal((await (await userRequest("", auth.cookie)).json()).data.user.email, "contact@example.com");
+  assert.deepEqual(await prisma.authIdentity.findMany({ where: { userId: auth.userId } }), identities);
+  for (const email of ["invalid", "", 42, "a".repeat(255) + "@example.com"]) {
+    assert.equal((await userRequest("", auth.cookie, { email }, "PATCH")).status, 400);
+  }
+  assert.equal((await (await userRequest("", auth.cookie)).json()).data.user.email, "contact@example.com");
+  assert.equal((await userRequest("", auth.cookie, { email: null }, "PATCH")).status, 200);
+  assert.equal((await (await userRequest("", auth.cookie)).json()).data.user.email, null);
+  assert.equal((await userRequest("", auth.cookie, { name: null }, "PATCH")).status, 200);
+  assert.equal((await (await request("/me", auth.cookie)).json()).data.user.name, null);
+});
+
 test("foreign addresses and unknown IDs are inaccessible; address validation is strict", async () => {
   const owner = await login(), other = await login();
   const response = await userRequest("/addresses", owner.cookie, { ...sampleAddress, isDefault: true });
@@ -245,7 +273,7 @@ test("foreign addresses and unknown IDs are inaccessible; address validation is 
 test("invalid profile types and lengths reject without changing persisted data", async () => {
   const auth = await login();
   const before = await prisma.user.findUniqueOrThrow({ where: { id: auth.userId } });
-  for (const body of [{ name: null }, { name: 123 }, { name: "a".repeat(101) }, { profileImage: 123 }, { profileImage: "not-a-url" }, { profileImage: "http://example.com/image.png" }, []]) {
+  for (const body of [{ name: 123 }, { name: "a".repeat(101) }, { profileImage: 123 }, { profileImage: "not-a-url" }, { profileImage: "http://example.com/image.png" }, []]) {
     const response = await userRequest("", auth.cookie, body, "PATCH");
     assert.equal(response.status, 400);
     assert.equal((await response.json()).error.code, "VALIDATION_ERROR");
@@ -678,7 +706,10 @@ test("authentication validates signature, claims, issuer, audience, algorithm, s
   const me = await request("/me", signed.cookie);
   assert.equal(me.status, 200);
   assert.equal(me.headers.get("cache-control"), "no-store");
-  assert.deepEqual(Object.keys((await me.json()).data.user).sort(), ["id", "name", "roles", "status"]);
+  const currentBuyer = (await me.json()).data.user;
+  assert.deepEqual(Object.keys(currentBuyer).sort(), ["email", "id", "name", "phone", "roles", "status"]);
+  assert.equal(currentBuyer.phone, signed.phone);
+  assert.equal(currentBuyer.email, null);
 });
 
 test("authorization reads current database roles and denies by default", async () => {
@@ -809,7 +840,11 @@ test("email OTP normalizes case, binds the HMAC channel, creates BUYER and reuse
   const user = (await verified.json()).data.user;
   assert.deepEqual(user.roles, ["BUYER"]);
   assert.equal(user.email, normalized);
-  assert.equal((await request("/me", cookies(verified).cookie)).status, 200);
+  const me = await request("/me", cookies(verified).cookie);
+  assert.equal(me.status, 200);
+  const contact = (await me.json()).data.user;
+  assert.equal(contact.email, normalized);
+  assert.equal(contact.phone, null);
   await prisma.otpChallenge.update({ where: { id: row.id }, data: { createdAt: new Date(Date.now() - 120000) } });
   const next = await request("/otp/request", "", { email: normalized });
   assert.equal(next.status, 200);
@@ -970,6 +1005,30 @@ registerMediaTests({
   prisma,
   base: () => base,
   csrf,
+  send: (path, cookie = "", body, method = body === undefined ? "GET" : "POST") => fetch(`${base}/api${path}`, {
+    method, headers: { ...csrf, Cookie: cookie, "Content-Type": "application/json" },
+    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+  }),
+  sendWithoutCsrf: (path, cookie = "", body, method = "POST") => fetch(`${base}/api${path}`, {
+    method, headers: { Origin: env.FRONTEND_ORIGIN, Cookie: cookie, "Content-Type": "application/json" },
+    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+  }),
+});
+
+registerCartTests({
+  prisma, login,
+  send: (path, cookie = "", body, method = body === undefined ? "GET" : "POST") => fetch(`${base}/api${path}`, {
+    method, headers: { ...csrf, Cookie: cookie, "Content-Type": "application/json" },
+    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+  }),
+  sendWithoutCsrf: (path, cookie = "", body, method = "POST") => fetch(`${base}/api${path}`, {
+    method, headers: { Origin: env.FRONTEND_ORIGIN, Cookie: cookie, "Content-Type": "application/json" },
+    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+  }),
+});
+
+registerWishlistTests({
+  prisma, login,
   send: (path, cookie = "", body, method = body === undefined ? "GET" : "POST") => fetch(`${base}/api${path}`, {
     method, headers: { ...csrf, Cookie: cookie, "Content-Type": "application/json" },
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),

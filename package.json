@@ -18,6 +18,7 @@
     "seed:roles": "tsx prisma/seed.ts",
     "seed:categories": "tsx prisma/seed-categories.ts",
     "seed:brands": "tsx prisma/seed-brands.ts"
+    ,"seed:products": "tsx prisma/seed-products.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

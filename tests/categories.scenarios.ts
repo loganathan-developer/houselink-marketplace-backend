@@ -93,8 +93,16 @@ export function registerCategoryTests(deps: {
     const authState = async () => ({ users: await prisma.user.count(), roles: await prisma.role.count(), assignments: await prisma.userRole.count(), sessions: await prisma.authSession.count() });
     const before = await authState();
     await seedCategorySamples();
+    const seededCategoryCount = await prisma.category.count();
     await seedCategorySamples();
-    assert.equal(await prisma.category.count(), 17);
+    assert.equal(await prisma.category.count(), seededCategoryCount);
+    assert(seededCategoryCount > 250);
+    for (const slug of ["men", "women", "kids", "beauty", "footwear", "accessories"]) {
+      assert(await prisma.category.findUnique({ where: { slug } }), `${slug} root was not seeded`);
+    }
+    assert.equal(await prisma.category.count({ where: { parent: { slug: "men" } } }), 7);
+    assert.equal(await prisma.category.count({ where: { parent: { slug: "women" } } }), 8);
+    assert.equal(await prisma.category.count({ where: { parent: { slug: "kids" } } }), 6);
     assert.equal(await prisma.attribute.count({ where: { code: { in: ["brand", "size", "color", "fabric", "fit", "pattern", "sleeve_length"] } } }), 7);
     assert.deepEqual(await authState(), before);
   });

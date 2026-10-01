@@ -15,6 +15,9 @@ import categoryAttributeAdminRoutes from "./modules/attributes/category-attribut
 import brandRoutes from "./modules/brands/brand.routes.js";
 import brandAdminRoutes from "./modules/brands/brand.admin.routes.js";
 import mediaRoutes from "./modules/media/media.routes.js";
+import productRoutes from "./modules/products/product.routes.js";
+import cartRoutes from "./modules/cart/cart.routes.js";
+import wishlistRoutes from "./modules/wishlist/wishlist.routes.js";
 import { localStorage } from "./modules/media/local-storage.adapter.js";
 import { env } from "./config/env.js";
 import { prisma } from "./config/database.js";
@@ -49,6 +52,9 @@ app.use("/api/admin/categories/:categoryId/attributes", categoryAttributeAdminRo
 app.use("/api/admin/categories", categoryAdminRoutes);
 app.use("/api/brands", brandRoutes);
 app.use("/api/categories", categoryRoutes);
+app.use("/api/products", productRoutes);
+app.use("/api/cart", cartRoutes);
+app.use("/api/wishlist", wishlistRoutes);
 
 app.get("/api/health", (_req, res) => {
   res.setHeader("Cache-Control", "no-store");

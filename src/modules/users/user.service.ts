@@ -2,7 +2,7 @@ import { prisma } from "../../config/database.js";
 import { HttpError } from "../../shared/errors/http-error.js";
 import type { AddressInput } from "./user.schema.js";
 
-export const profileSelect = { id: true, name: true, profileImage: true, createdAt: true, updatedAt: true } as const;
+export const profileSelect = { id: true, name: true, email: true, profileImage: true, createdAt: true, updatedAt: true } as const;
 
 export async function mutateAddress(userId: string, action: "create" | "update" | "delete" | "default", addressId?: string, data: Partial<AddressInput> = {}) {
   const updates = Object.fromEntries(Object.entries(data).filter(([, value]) => value !== undefined)) as {

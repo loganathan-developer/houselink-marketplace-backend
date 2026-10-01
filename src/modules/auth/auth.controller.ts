@@ -31,9 +31,9 @@ export async function refreshToken(req: Request, res: Response) {
 }
 export async function getMe(req: Request, res: Response) {
   if (!req.auth) throw unauthenticated();
-  const user = await prisma.user.findUnique({ where: { id: req.auth.userId }, select: { id: true, name: true, status: true } });
+  const user = await prisma.user.findUnique({ where: { id: req.auth.userId }, select: { id: true, name: true, email: true, status: true, identities: { where: { provider: { in: ["PHONE", "EMAIL"] } }, orderBy: { createdAt: "asc" }, select: { provider: true, identifier: true } } } });
   if (!user || user.status !== "ACTIVE") throw unauthenticated();
-  res.json({ success: true, data: { user: { id: user.id, name: user.name, status: user.status, roles: req.auth.roles } } });
+  res.json({ success: true, data: { user: { id: user.id, name: user.name, status: user.status, roles: req.auth.roles, phone: user.identities.find((identity) => identity.provider === "PHONE")?.identifier ?? null, email: user.email ?? user.identities.find((identity) => identity.provider === "EMAIL")?.identifier ?? null } } });
 }
 export async function logout(req: Request, res: Response) {
   await revokeSessionFromCookies(readCookie(req, REFRESH_COOKIE), readCookie(req, ACCESS_COOKIE));
